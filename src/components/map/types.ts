@@ -29,6 +29,8 @@ export interface MapProps {
   onRegionChange: (region: MapRegion) => void
   // Tap on empty map (no spot, no open tooltip) — used to collapse the sheet.
   onMapPress: () => void
+  // A spot marker was selected (tooltip opening) — used to collapse the sheet.
+  onSpotSelect: () => void
 }
 
 export type MapRenderer = 'webview' | 'native'

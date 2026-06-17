@@ -228,6 +228,7 @@ export default function HomeScreen() {
           onMarkerPress={openFacility}
           onRegionChange={onRegionChange}
           onMapPress={() => setCollapseNonce((n) => n + 1)}
+          onSpotSelect={() => setCollapseNonce((n) => n + 1)}
         />
       </View>
 

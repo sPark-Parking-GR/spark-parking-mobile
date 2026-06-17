@@ -174,7 +174,7 @@ export function BottomSheet({
           <View style={styles.grip} />
           <View style={styles.titleRow}>
             <Text style={styles.title}>{headerLabel}</Text>
-            <Text style={styles.hint}>{expanded ? 'Λίστα' : 'Σύρε για λίστα'}</Text>
+            {!expanded && <Text style={styles.hint}>Σύρε για λίστα</Text>}
           </View>
         </View>
       </GestureDetector>

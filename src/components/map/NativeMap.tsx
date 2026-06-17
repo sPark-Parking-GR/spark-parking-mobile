@@ -30,6 +30,7 @@ export function NativeMap({
   onMarkerPress,
   onRegionChange,
   onMapPress,
+  onSpotSelect,
 }: MapProps) {
   const ref = useRef<MapView>(null)
   const markerRefs = useRef<Record<string, ElementRef<typeof Marker> | null>>({})
@@ -112,6 +113,7 @@ export function NativeMap({
           onPress={async () => {
             selectedId.current = r.id
             calloutOpen.current = true
+            onSpotSelect()
             const cam = await ref.current?.getCamera()
             if (
               cam &&

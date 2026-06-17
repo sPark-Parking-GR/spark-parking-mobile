@@ -122,6 +122,7 @@ function buildHtml(center: { lat: number; lng: number }): string {
         m._color = it.color;
         m.bindPopup(popupHtml(it), { closeButton: false, autoClose: true, closeOnClick: true, autoPan: false });
         m.on('click', function () {
+          post({ type: 'spotpress' });
           var ll = m.getLatLng();
           var c = map.getCenter();
           if (Math.abs(c.lat - ll.lat) < CENTER_EPS && Math.abs(c.lng - ll.lng) < CENTER_EPS) {
@@ -152,6 +153,7 @@ export function LeafletMap({
   onMarkerPress,
   onRegionChange,
   onMapPress,
+  onSpotSelect,
 }: MapProps) {
   const ref = useRef<WebView>(null)
   const html = useMemo(() => buildHtml(center), [])
@@ -235,6 +237,8 @@ export function LeafletMap({
         onMarkerPress(msg.id)
       } else if (msg.type === 'mappress') {
         onMapPress()
+      } else if (msg.type === 'spotpress') {
+        onSpotSelect()
       } else if (
         msg.type === 'region' &&
         msg.lat != null &&
