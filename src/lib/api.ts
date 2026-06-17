@@ -95,6 +95,7 @@ export interface SearchParams {
   lat: number
   lng: number
   radiusMeters?: number
+  bounds?: { north: number; south: number; east: number; west: number }
   startsAt: string
   endsAt: string
   vehicleType?: string
@@ -131,10 +132,18 @@ export function searchFacilities(
     radiusMeters: String(params.radiusMeters ?? 3000),
     startsAt: params.startsAt,
     endsAt: params.endsAt,
+    ...(params.bounds
+      ? {
+          north: String(params.bounds.north),
+          south: String(params.bounds.south),
+          east: String(params.bounds.east),
+          west: String(params.bounds.west),
+        }
+      : {}),
     ...(params.vehicleType ? { vehicleType: params.vehicleType } : {}),
   })
   return request<FacilitySearchResult[]>(`/facilities/search?${query.toString()}`, {
-    signal: opts?.signal,
+    signal: opts?.signal as RequestInit['signal'],
   })
 }
 

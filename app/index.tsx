@@ -2,33 +2,47 @@ import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useEffect, useRef, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
-import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { BottomSheet } from '../src/components/BottomSheet'
+import { defaultEnd, defaultStart, type BookingValue } from '../src/components/BookingForm'
+import { computeDistanceMeters } from '@parqin/maps'
 import { Map } from '../src/components/map'
-import type { MapRegion } from '../src/components/map'
-import { SearchPanel, type AppliedQuery } from '../src/components/SearchPanel'
+import type { MapBounds, MapRegion } from '../src/components/map'
 import { searchFacilities, type FacilitySearchResult } from '../src/lib/api'
-import { CITY_PRESETS } from '../src/lib/constants'
+import { FALLBACK_CENTER } from '../src/lib/constants'
 import { useUserLocation } from '../src/lib/location'
 import { useDebouncedCallback } from '../src/lib/useDebouncedCallback'
 import { colors, space } from '../src/theme'
 
 const MIN_RADIUS = 300
-const MAX_RADIUS = 60_000
-const PRESET = { lat: CITY_PRESETS[0]!.lat, lng: CITY_PRESETS[0]!.lng }
+const MAX_RADIUS = 50_000
+// How many of the closest parkings to frame alongside the user on first load.
+const FIT_NEAREST = 3
+
+// The browse list uses a default window just to surface availability; the user
+// picks the actual booking window (and sees the price) on the facility screen.
+function defaultWindow(): BookingValue {
+  const start = defaultStart()
+  return {
+    startsAt: start.toISOString(),
+    endsAt: defaultEnd(start).toISOString(),
+    vehicleType: 'CAR',
+  }
+}
 
 export default function HomeScreen() {
-  const insets = useSafeAreaInsets()
   const { coords, status, retry } = useUserLocation()
 
-  const [applied, setApplied] = useState<AppliedQuery | null>(null)
-  const [center, setCenter] = useState(PRESET)
+  const [applied] = useState<BookingValue>(defaultWindow)
+  const [center, setCenter] = useState(FALLBACK_CENTER)
   const [centerNonce, setCenterNonce] = useState(0)
   const [viewport, setViewport] = useState<MapRegion | null>(null)
   const [results, setResults] = useState<FacilitySearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [fitBounds, setFitBounds] = useState<MapBounds | null>(null)
+  const [fitNonce, setFitNonce] = useState(0)
   const autoLocated = useRef(false)
+  const fitRequested = useRef(false)
 
   function recenterTo(c: { lat: number; lng: number }) {
     setCenter(c)
@@ -43,10 +57,47 @@ export default function HomeScreen() {
     }
   }, [coords])
 
+  // On the first GPS fix, run one explicit search centered on the user and frame
+  // the user with the closest few parkings. Decoupled from the viewport (which is
+  // driven by map gestures) so the initial fit fires deterministically instead of
+  // racing the recenter → region → debounce → search round-trip.
+  useEffect(() => {
+    if (fitRequested.current || !coords) return
+    fitRequested.current = true
+    const here = coords
+    const controller = new AbortController()
+    searchFacilities(
+      {
+        lat: here.lat,
+        lng: here.lng,
+        radiusMeters: MAX_RADIUS,
+        startsAt: applied.startsAt,
+        endsAt: applied.endsAt,
+        vehicleType: applied.vehicleType,
+      },
+      { signal: controller.signal },
+    )
+      .then((data) => {
+        if (data.length === 0) return
+        const nearest = [...data]
+          .sort((a, b) => computeDistanceMeters(here, a) - computeDistanceMeters(here, b))
+          .slice(0, FIT_NEAREST)
+        setFitBounds({
+          north: Math.max(here.lat, ...nearest.map((r) => r.lat)),
+          south: Math.min(here.lat, ...nearest.map((r) => r.lat)),
+          east: Math.max(here.lng, ...nearest.map((r) => r.lng)),
+          west: Math.min(here.lng, ...nearest.map((r) => r.lng)),
+        })
+        setFitNonce((n) => n + 1)
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [coords, applied.startsAt, applied.endsAt, applied.vehicleType])
+
   // Refetch for the visible map area (debounced) or when the booking window /
   // vehicle changes. Viewport drives the query coords; the form supplies the rest.
   useEffect(() => {
-    if (!applied || !viewport) return
+    if (!viewport) return
     const controller = new AbortController()
     setLoading(true)
     setError(null)
@@ -55,6 +106,7 @@ export default function HomeScreen() {
         lat: viewport.lat,
         lng: viewport.lng,
         radiusMeters: viewport.radiusMeters,
+        bounds: viewport.bounds,
         startsAt: applied.startsAt,
         endsAt: applied.endsAt,
         vehicleType: applied.vehicleType,
@@ -77,13 +129,9 @@ export default function HomeScreen() {
       lat: region.lat,
       lng: region.lng,
       radiusMeters: Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, region.radiusMeters)),
+      bounds: region.bounds,
     })
   }, 350)
-
-  function handleSearch(query: AppliedQuery) {
-    setApplied(query)
-    recenterTo({ lat: query.lat, lng: query.lng })
-  }
 
   function locateMe() {
     if (coords) recenterTo({ ...coords })
@@ -91,7 +139,6 @@ export default function HomeScreen() {
   }
 
   function openFacility(id: string) {
-    if (!applied) return
     router.push({
       pathname: '/facility/[id]',
       params: {
@@ -109,14 +156,13 @@ export default function HomeScreen() {
         <Map
           center={center}
           centerNonce={centerNonce}
+          user={coords}
+          fitBounds={fitBounds}
+          fitNonce={fitNonce}
           results={results}
           onMarkerPress={openFacility}
           onRegionChange={onRegionChange}
         />
-      </View>
-
-      <View style={[styles.top, { top: insets.top + space.sm }]} pointerEvents="box-none">
-        <SearchPanel onSearch={handleSearch} userCoords={coords} />
       </View>
 
       <Pressable
@@ -137,7 +183,6 @@ export default function HomeScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  top: { position: 'absolute', left: space.md, right: space.md },
   fab: {
     position: 'absolute',
     right: space.md,

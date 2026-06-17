@@ -9,4 +9,4 @@ export function Map(props: MapProps) {
   return <LeafletMap {...props} />
 }
 
-export type { MapProps, MapRegion } from './types'
+export type { MapBounds, MapProps, MapRegion } from './types'

@@ -1,6 +1,7 @@
 import { router, useLocalSearchParams } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { BookingForm, type BookingValue } from '../../src/components/BookingForm'
 import { Badge, Button, Card } from '../../src/components/ui'
 import { getFacility, getQuote, type FacilityDetail, type PriceQuote } from '../../src/lib/api'
 import { formatMoney, formatTimeRange } from '../../src/lib/format'
@@ -9,32 +10,25 @@ import { colors, font, space } from '../../src/theme'
 export default function FacilityScreen() {
   const params = useLocalSearchParams<{
     id: string
-    startsAt: string
-    endsAt: string
-    vehicleType: string
+    startsAt?: string
+    endsAt?: string
+    vehicleType?: string
   }>()
 
   const [facility, setFacility] = useState<FacilityDetail | null>(null)
+  const [booking, setBooking] = useState<BookingValue | null>(null)
   const [quote, setQuote] = useState<PriceQuote | null>(null)
+  const [quoteLoading, setQuoteLoading] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
-  const hasWindow = Boolean(params.startsAt && params.endsAt && params.vehicleType)
 
   useEffect(() => {
     let cancelled = false
     setLoading(true)
     setError(null)
     getFacility(params.id)
-      .then(async (f) => {
-        if (cancelled) return
-        setFacility(f)
-        if (hasWindow) {
-          const q = await getQuote(params.id, params.startsAt, params.endsAt, params.vehicleType).catch(
-            () => null,
-          )
-          if (!cancelled) setQuote(q)
-        }
+      .then((f) => {
+        if (!cancelled) setFacility(f)
       })
       .catch((e) => {
         if (!cancelled) setError(e instanceof Error ? e.message : 'Δεν βρέθηκε ο χώρος')
@@ -45,18 +39,38 @@ export default function FacilityScreen() {
     return () => {
       cancelled = true
     }
-  }, [params.id, params.startsAt, params.endsAt, params.vehicleType])
+  }, [params.id])
+
+  // Recompute the price whenever the booking form changes.
+  useEffect(() => {
+    if (!booking) return
+    let cancelled = false
+    setQuoteLoading(true)
+    getQuote(params.id, booking.startsAt, booking.endsAt, booking.vehicleType)
+      .then((q) => {
+        if (!cancelled) setQuote(q)
+      })
+      .catch(() => {
+        if (!cancelled) setQuote(null)
+      })
+      .finally(() => {
+        if (!cancelled) setQuoteLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [params.id, booking?.startsAt, booking?.endsAt, booking?.vehicleType])
 
   function book() {
-    if (!quote || !facility) return
+    if (!quote || !facility || !booking) return
     router.push({
       pathname: '/checkout',
       params: {
         facilityId: facility.id,
         name: facility.name,
-        startsAt: params.startsAt,
-        endsAt: params.endsAt,
-        vehicleType: params.vehicleType,
+        startsAt: booking.startsAt,
+        endsAt: booking.endsAt,
+        vehicleType: booking.vehicleType,
       },
     })
   }
@@ -102,30 +116,46 @@ export default function FacilityScreen() {
         ) : null}
       </Card>
 
-      {quote ? (
-        <Card style={styles.card}>
-          <Text style={styles.cardTitle}>Τιμή</Text>
-          <Text style={styles.muted}>{formatTimeRange(quote.startsAt, quote.endsAt)}</Text>
-          <View style={styles.divider} />
-          {quote.lineItems.map((item, i) => (
-            <View key={i} style={styles.row}>
-              <Text style={styles.rowLabel}>
-                {item.label} × {item.quantity}
-              </Text>
-              <Text style={styles.rowValue}>{formatMoney(item.subtotalCents, quote.currency)}</Text>
+      <Card style={styles.card}>
+        <Text style={styles.cardTitle}>Στοιχεία κράτησης</Text>
+        <BookingForm
+          initial={{
+            startsAt: params.startsAt,
+            endsAt: params.endsAt,
+            vehicleType: params.vehicleType,
+          }}
+          onChange={setBooking}
+        />
+      </Card>
+
+      <Card style={styles.card}>
+        <Text style={styles.cardTitle}>Τιμή</Text>
+        {quote ? (
+          <>
+            <Text style={styles.muted}>{formatTimeRange(quote.startsAt, quote.endsAt)}</Text>
+            <View style={styles.divider} />
+            {quote.lineItems.map((item, i) => (
+              <View key={i} style={styles.row}>
+                <Text style={styles.rowLabel}>
+                  {item.label} × {item.quantity}
+                </Text>
+                <Text style={styles.rowValue}>{formatMoney(item.subtotalCents, quote.currency)}</Text>
+              </View>
+            ))}
+            <View style={styles.divider} />
+            <View style={styles.row}>
+              <Text style={styles.totalLabel}>Σύνολο</Text>
+              <Text style={styles.totalValue}>{formatMoney(quote.totalCents, quote.currency)}</Text>
             </View>
-          ))}
-          <View style={styles.divider} />
-          <View style={styles.row}>
-            <Text style={styles.totalLabel}>Σύνολο</Text>
-            <Text style={styles.totalValue}>{formatMoney(quote.totalCents, quote.currency)}</Text>
-          </View>
-        </Card>
-      ) : (
-        <Card style={styles.card}>
-          <Text style={styles.muted}>Επίλεξε ώρα άφιξης και αναχώρησης για τιμή.</Text>
-        </Card>
-      )}
+          </>
+        ) : quoteLoading ? (
+          <ActivityIndicator color={colors.primary} />
+        ) : (
+          <Text style={styles.muted}>
+            Δεν είναι δυνατός ο υπολογισμός τιμής για αυτό το διάστημα.
+          </Text>
+        )}
+      </Card>
 
       {quote ? (
         <View style={styles.cta}>

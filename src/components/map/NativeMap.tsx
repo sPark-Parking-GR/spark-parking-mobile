@@ -2,8 +2,9 @@ import { useEffect, useRef } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import MapView, { Callout, Marker, type Region } from 'react-native-maps'
 import type { FacilitySearchResult } from '../../lib/api'
-import { formatDistance, formatMoney, formatPriceShort } from '../../lib/format'
+import { formatDistance, formatMoney } from '../../lib/format'
 import { colors, font } from '../../theme'
+import { LogoMark } from './logo'
 import type { MapProps } from './types'
 
 function metaLine(r: FacilitySearchResult): string {
@@ -16,10 +17,16 @@ function metaLine(r: FacilitySearchResult): string {
 }
 
 const DELTA = 0.04
+// Floor on the fitted span so a user standing next to a parking doesn't zoom to street level.
+const MIN_FIT_DELTA = 0.01
+// Headroom so neither the user dot nor the nearest pin sits on the screen edge.
+const FIT_PADDING = 1.4
 
 export function NativeMap({
   center,
   centerNonce,
+  fitBounds,
+  fitNonce,
   results,
   onMarkerPress,
   onRegionChange,
@@ -38,11 +45,35 @@ export function NativeMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center.lat, center.lng, centerNonce])
 
+  useEffect(() => {
+    if (!fitBounds) return
+    ref.current?.animateToRegion(
+      {
+        latitude: (fitBounds.north + fitBounds.south) / 2,
+        longitude: (fitBounds.east + fitBounds.west) / 2,
+        latitudeDelta: Math.max(MIN_FIT_DELTA, (fitBounds.north - fitBounds.south) * FIT_PADDING),
+        longitudeDelta: Math.max(MIN_FIT_DELTA, (fitBounds.east - fitBounds.west) * FIT_PADDING),
+      },
+      450,
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitNonce])
+
   function handleRegion(r: Region) {
     const latM = r.latitudeDelta * 111_320
     const lngM = r.longitudeDelta * 111_320 * Math.cos((r.latitude * Math.PI) / 180)
     const radiusMeters = Math.round(Math.sqrt(latM * latM + lngM * lngM) / 2)
-    onRegionChange({ lat: r.latitude, lng: r.longitude, radiusMeters })
+    onRegionChange({
+      lat: r.latitude,
+      lng: r.longitude,
+      radiusMeters,
+      bounds: {
+        north: r.latitude + r.latitudeDelta / 2,
+        south: r.latitude - r.latitudeDelta / 2,
+        east: r.longitude + r.longitudeDelta / 2,
+        west: r.longitude - r.longitudeDelta / 2,
+      },
+    })
   }
 
   return (
@@ -61,14 +92,11 @@ export function NativeMap({
           anchor={{ x: 0.5, y: 1 }}
         >
           <View style={styles.marker}>
-            <View style={[styles.pill, { backgroundColor: r.available ? colors.primary : '#9AA0A6' }]}>
-              <Text style={styles.pillText}>
-                {r.priceCents != null ? formatPriceShort(r.priceCents, r.currency) : '—'}
-              </Text>
+            <View style={[styles.pin, { backgroundColor: r.available ? colors.primary : '#9AA0A6' }]}>
+              <View style={styles.pinInner}>
+                <LogoMark size={16} color="#fff" />
+              </View>
             </View>
-            <View
-              style={[styles.tail, { borderTopColor: r.available ? colors.primary : '#9AA0A6' }]}
-            />
           </View>
           <Callout onPress={() => onMarkerPress(r.id)}>
             <View style={styles.callout}>
@@ -86,30 +114,26 @@ export function NativeMap({
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  marker: { alignItems: 'center' },
-  pill: {
-    paddingHorizontal: 11,
-    paddingVertical: 5,
-    borderRadius: 16,
+  marker: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  pin: {
+    width: 34,
+    height: 34,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: '#fff',
+    borderTopLeftRadius: 17,
+    borderTopRightRadius: 17,
+    borderBottomRightRadius: 0,
+    borderBottomLeftRadius: 17,
+    transform: [{ rotate: '45deg' }],
     shadowColor: '#000',
     shadowOpacity: 0.22,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 2 },
     elevation: 4,
   },
-  pillText: { color: '#fff', fontSize: 13, fontWeight: '700', lineHeight: 15 },
-  tail: {
-    width: 0,
-    height: 0,
-    marginTop: -1,
-    borderLeftWidth: 5,
-    borderRightWidth: 5,
-    borderTopWidth: 6,
-    borderLeftColor: 'transparent',
-    borderRightColor: 'transparent',
-  },
+  pinInner: { transform: [{ rotate: '-45deg' }] },
   callout: { minWidth: 180, paddingVertical: 2, gap: 2 },
   calloutName: { fontSize: 14, fontWeight: '600', color: colors.textMain },
   calloutAddr: { fontSize: font.tiny, color: colors.textSecondary },
