@@ -1,18 +1,15 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, type ElementRef } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import MapView, { Callout, Marker, type Region } from 'react-native-maps'
 import type { FacilitySearchResult } from '../../lib/api'
-import { formatDistance, formatMoney } from '../../lib/format'
+import { formatDistance } from '../../lib/format'
 import { colors, font } from '../../theme'
 import { LogoMark } from './logo'
 import type { MapProps } from './types'
 
 function metaLine(r: FacilitySearchResult): string {
   return (
-    (r.available ? 'Διαθέσιμο' : 'Πλήρες') +
-    ' · ' +
-    formatDistance(r.distanceMeters) +
-    (r.priceCents != null ? ' · ' + formatMoney(r.priceCents, r.currency) : '')
+    (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters)
   )
 }
 
@@ -21,6 +18,8 @@ const DELTA = 0.04
 const MIN_FIT_DELTA = 0.01
 // Headroom so neither the user dot nor the nearest pin sits on the screen edge.
 const FIT_PADDING = 1.4
+// ~1m: if the spot is already centered, skip the pan (and its refetch).
+const CENTER_EPS = 1e-5
 
 export function NativeMap({
   center,
@@ -30,8 +29,12 @@ export function NativeMap({
   results,
   onMarkerPress,
   onRegionChange,
+  onMapPress,
 }: MapProps) {
   const ref = useRef<MapView>(null)
+  const markerRefs = useRef<Record<string, ElementRef<typeof Marker> | null>>({})
+  const selectedId = useRef<string | null>(null)
+  const calloutOpen = useRef(false)
 
   const region: Region = {
     latitude: center.lat,
@@ -59,6 +62,11 @@ export function NativeMap({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitNonce])
 
+  // Refetch re-renders the markers, dropping the open callout; reopen the selected one.
+  useEffect(() => {
+    if (selectedId.current) markerRefs.current[selectedId.current]?.showCallout()
+  }, [results])
+
   function handleRegion(r: Region) {
     const latM = r.latitudeDelta * 111_320
     const lngM = r.longitudeDelta * 111_320 * Math.cos((r.latitude * Math.PI) / 180)
@@ -83,13 +91,36 @@ export function NativeMap({
       initialRegion={region}
       showsUserLocation
       onRegionChangeComplete={handleRegion}
+      onPress={(e) => {
+        if (e.nativeEvent.action === 'marker-press') return
+        if (calloutOpen.current) {
+          calloutOpen.current = false
+          return
+        }
+        onMapPress()
+      }}
     >
       {results.map((r) => (
         <Marker
           key={r.id}
+          ref={(node) => {
+            markerRefs.current[r.id] = node
+          }}
           coordinate={{ latitude: r.lat, longitude: r.lng }}
           tracksViewChanges={false}
           anchor={{ x: 0.5, y: 1 }}
+          onPress={async () => {
+            selectedId.current = r.id
+            calloutOpen.current = true
+            const cam = await ref.current?.getCamera()
+            if (
+              cam &&
+              Math.abs(cam.center.latitude - r.lat) < CENTER_EPS &&
+              Math.abs(cam.center.longitude - r.lng) < CENTER_EPS
+            )
+              return
+            ref.current?.animateCamera({ center: { latitude: r.lat, longitude: r.lng } }, { duration: 350 })
+          }}
         >
           <View style={styles.marker}>
             <View style={[styles.pin, { backgroundColor: r.available ? colors.primary : '#9AA0A6' }]}>

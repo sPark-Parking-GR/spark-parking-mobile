@@ -27,6 +27,8 @@ export interface MapProps {
   results: FacilitySearchResult[]
   onMarkerPress: (id: string) => void
   onRegionChange: (region: MapRegion) => void
+  // Tap on empty map (no spot, no open tooltip) — used to collapse the sheet.
+  onMapPress: () => void
 }
 
 export type MapRenderer = 'webview' | 'native'

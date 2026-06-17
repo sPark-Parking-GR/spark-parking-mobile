@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, View } from 'react-native'
 import { BottomSheet } from '../src/components/BottomSheet'
 import { defaultEnd, defaultStart, type BookingValue } from '../src/components/BookingForm'
@@ -17,6 +17,32 @@ const MIN_RADIUS = 300
 const MAX_RADIUS = 50_000
 // How many of the closest parkings to frame alongside the user on first load.
 const FIT_NEAREST = 3
+// Over-fetch this fraction beyond the viewport on each side, so small pans stay
+// inside the already-fetched area and need no new request.
+const FETCH_PADDING = 0.5
+
+function contains(outer: MapBounds, inner: MapBounds): boolean {
+  return (
+    inner.north <= outer.north &&
+    inner.south >= outer.south &&
+    inner.east <= outer.east &&
+    inner.west >= outer.west
+  )
+}
+
+function padBounds(b: MapBounds, factor: number): MapBounds {
+  const dLat = (b.north - b.south) * factor
+  const dLng = (b.east - b.west) * factor
+  return { north: b.north + dLat, south: b.south - dLat, east: b.east + dLng, west: b.west - dLng }
+}
+
+function within(b: MapBounds, p: { lat: number; lng: number }): boolean {
+  return p.lat >= b.south && p.lat <= b.north && p.lng >= b.west && p.lng <= b.east
+}
+
+// Module-scoped so the one-off initial fit (and its search) runs once per app
+// session, not on every navigation back to Home — avoids redundant data/battery.
+let initialFitDone = false
 
 // The browse list uses a default window just to surface availability; the user
 // picks the actual booking window (and sees the price) on the facility screen.
@@ -41,8 +67,11 @@ export default function HomeScreen() {
   const [error, setError] = useState<string | null>(null)
   const [fitBounds, setFitBounds] = useState<MapBounds | null>(null)
   const [fitNonce, setFitNonce] = useState(0)
+  const [collapseNonce, setCollapseNonce] = useState(0)
+  const [visibleBounds, setVisibleBounds] = useState<MapBounds | null>(null)
   const autoLocated = useRef(false)
-  const fitRequested = useRef(false)
+  // The padded bounds the current results cover; pans inside it skip refetching.
+  const lastFetched = useRef<MapBounds | null>(null)
 
   function recenterTo(c: { lat: number; lng: number }) {
     setCenter(c)
@@ -62,8 +91,8 @@ export default function HomeScreen() {
   // driven by map gestures) so the initial fit fires deterministically instead of
   // racing the recenter → region → debounce → search round-trip.
   useEffect(() => {
-    if (fitRequested.current || !coords) return
-    fitRequested.current = true
+    if (initialFitDone || !coords) return
+    initialFitDone = true
     const here = coords
     const controller = new AbortController()
     searchFacilities(
@@ -99,14 +128,21 @@ export default function HomeScreen() {
   useEffect(() => {
     if (!viewport) return
     const controller = new AbortController()
-    setLoading(true)
+    // Fetch a padded area so nearby pans are already covered; remember it so the
+    // region handler can skip refetching while the viewport stays inside it.
+    const requestBounds = padBounds(viewport.bounds, FETCH_PADDING)
+    lastFetched.current = requestBounds
+    // Skeleton only when there's nothing to show. With a populated list the
+    // refresh is silent (swap in place), so consecutive map moves don't flash
+    // the loading state; an empty result then surfaces the empty-state.
+    if (results.length === 0) setLoading(true)
     setError(null)
     searchFacilities(
       {
         lat: viewport.lat,
         lng: viewport.lng,
         radiusMeters: viewport.radiusMeters,
-        bounds: viewport.bounds,
+        bounds: requestBounds,
         startsAt: applied.startsAt,
         endsAt: applied.endsAt,
         vehicleType: applied.vehicleType,
@@ -116,39 +152,68 @@ export default function HomeScreen() {
       .then((data) => setResults(data))
       .catch((e) => {
         if (e instanceof Error && e.name === 'AbortError') return
+        lastFetched.current = null
         setError(e instanceof Error ? e.message : 'Η αναζήτηση απέτυχε')
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
       })
     return () => controller.abort()
+    // results is read for the initial-load check only; adding it would refetch on every result change.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewport, applied?.startsAt, applied?.endsAt, applied?.vehicleType])
 
+  // The API returns distance from the search center (the viewport), so it drifts
+  // as the map pans. Recompute it from the user's location and sort by it, so the
+  // displayed distance is the true user→spot distance and stays stable on pan.
+  // Markers keep the full (over-fetched) set so pans reveal nearby spots instantly.
+  const mapResults = useMemo(() => {
+    if (!coords) return results
+    return results
+      .map((r) => ({ ...r, distanceMeters: computeDistanceMeters(coords, r) }))
+      .sort((a, b) => a.distanceMeters - b.distanceMeters)
+  }, [results, coords])
+
+  // The list shows only spots inside the current viewport — the over-fetched ring
+  // stays on the map but out of the list.
+  const listResults = useMemo(
+    () => (visibleBounds ? mapResults.filter((r) => within(visibleBounds, r)) : mapResults),
+    [mapResults, visibleBounds],
+  )
+
   const onRegionChange = useDebouncedCallback((region: MapRegion) => {
+    // Always track the visible area so the list shows only in-view spots, even
+    // when the fetch is skipped.
+    setVisibleBounds(region.bounds)
+    // Skip the request while the visible area stays within what we already fetched.
+    if (lastFetched.current && contains(lastFetched.current, region.bounds)) return
     setViewport({
       lat: region.lat,
       lng: region.lng,
       radiusMeters: Math.min(MAX_RADIUS, Math.max(MIN_RADIUS, region.radiusMeters)),
       bounds: region.bounds,
     })
-  }, 350)
+  }, 700)
 
   function locateMe() {
     if (coords) recenterTo({ ...coords })
     retry()
   }
 
-  function openFacility(id: string) {
-    router.push({
-      pathname: '/facility/[id]',
-      params: {
-        id,
-        startsAt: applied.startsAt,
-        endsAt: applied.endsAt,
-        vehicleType: applied.vehicleType,
-      },
-    })
-  }
+  const openFacility = useCallback(
+    (id: string) => {
+      router.push({
+        pathname: '/facility/[id]',
+        params: {
+          id,
+          startsAt: applied.startsAt,
+          endsAt: applied.endsAt,
+          vehicleType: applied.vehicleType,
+        },
+      })
+    },
+    [applied.startsAt, applied.endsAt, applied.vehicleType],
+  )
 
   return (
     <View style={styles.root}>
@@ -159,9 +224,10 @@ export default function HomeScreen() {
           user={coords}
           fitBounds={fitBounds}
           fitNonce={fitNonce}
-          results={results}
+          results={mapResults}
           onMarkerPress={openFacility}
           onRegionChange={onRegionChange}
+          onMapPress={() => setCollapseNonce((n) => n + 1)}
         />
       </View>
 
@@ -176,7 +242,13 @@ export default function HomeScreen() {
         />
       </Pressable>
 
-      <BottomSheet results={results} loading={loading} error={error} onSelect={openFacility} />
+      <BottomSheet
+        results={listResults}
+        loading={loading}
+        error={error}
+        onSelect={openFacility}
+        collapse={collapseNonce}
+      />
     </View>
   )
 }

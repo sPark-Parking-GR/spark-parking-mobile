@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
-import { formatDistance, formatMoney } from '../../lib/format'
+import { formatDistance } from '../../lib/format'
 import { colors } from '../../theme'
 import { LOGO_PATHS, LOGO_VIEWBOX } from './logo'
 import type { MapProps } from './types'
@@ -60,8 +60,18 @@ function buildHtml(center: { lat: number; lng: number }): string {
       else userMarker = L.marker([lat, lng], { icon: icon, interactive: false, zIndexOffset: 1000 }).addTo(map);
     };
     window.go = function (id) { post({ type: 'navigate', id: id }); };
-    // Close the tooltip on any map movement (drag/zoom/resize).
-    map.on('movestart zoomstart resize', function () { map.closePopup(); });
+    // Suppress the close handler while we programmatically center on a tapped spot.
+    var selecting = false;
+    // ~1m: if the spot is already centered, skip the pan (and its refetch).
+    var CENTER_EPS = 1e-5;
+    // Close the tooltip on any user-driven map movement (drag/zoom/resize).
+    map.on('movestart zoomstart resize', function () { if (!selecting) map.closePopup(); });
+    // A tap on empty map collapses the sheet — but if a tooltip is open, that tap
+    // just closes the tooltip (popup still open at click time), so skip it.
+    var popupOpen = false;
+    map.on('popupopen', function () { popupOpen = true; });
+    map.on('popupclose', function () { popupOpen = false; });
+    map.on('click', function () { if (!popupOpen) post({ type: 'mappress' }); });
     function postRegion() {
       var b = map.getBounds();
       var c = b.getCenter();
@@ -72,28 +82,58 @@ function buildHtml(center: { lat: number; lng: number }): string {
     }
     map.on('moveend', postRegion);
     map.whenReady(postRegion);
+    function makeIcon(color) {
+      return L.divIcon({
+        className: '',
+        html: '<div class="marker">' +
+                '<div class="pin" style="background:' + color + '">' +
+                  '<div class="pin__inner">' + ${JSON.stringify(LOGO_SVG)} + '</div>' +
+                '</div>' +
+              '</div>',
+        iconSize: [0, 0], iconAnchor: [0, 0]
+      });
+    }
+    function popupHtml(it) {
+      return '<div class="tip" onclick="window.go(\\'' + it.id + '\\')">' +
+               '<div class="tip__name">' + it.name + '</div>' +
+               '<div class="tip__addr">' + it.address + '</div>' +
+               '<div class="tip__meta">' + it.meta + '</div>' +
+               '<div class="tip__cta">Λεπτομέρειες →</div>' +
+             '</div>';
+    }
+    // Persistent markers keyed by id. Refetch reconciles in place so the tapped
+    // marker (and its open tooltip) is never destroyed and re-created.
+    var markers = {};
     window.render = function (items) {
-      layer.clearLayers();
+      var next = {};
+      items.forEach(function (it) { next[it.id] = true; });
+      Object.keys(markers).forEach(function (id) {
+        if (!next[id]) { layer.removeLayer(markers[id]); delete markers[id]; }
+      });
       items.forEach(function (it) {
-        var icon = L.divIcon({
-          className: '',
-          html: '<div class="marker">' +
-                  '<div class="pin" style="background:' + it.color + '">' +
-                    '<div class="pin__inner">' + ${JSON.stringify(LOGO_SVG)} + '</div>' +
-                  '</div>' +
-                '</div>',
-          iconSize: [0, 0], iconAnchor: [0, 0]
+        var m = markers[it.id];
+        if (m) {
+          m.setLatLng([it.lat, it.lng]);
+          if (m._color !== it.color) { m.setIcon(makeIcon(it.color)); m._color = it.color; }
+          m.setPopupContent(popupHtml(it));
+          return;
+        }
+        m = L.marker([it.lat, it.lng], { icon: makeIcon(it.color) }).addTo(layer);
+        m._color = it.color;
+        m.bindPopup(popupHtml(it), { closeButton: false, autoClose: true, closeOnClick: true, autoPan: false });
+        m.on('click', function () {
+          var ll = m.getLatLng();
+          var c = map.getCenter();
+          if (Math.abs(c.lat - ll.lat) < CENTER_EPS && Math.abs(c.lng - ll.lng) < CENTER_EPS) {
+            m.openPopup();
+            return;
+          }
+          selecting = true;
+          map.setView([ll.lat, ll.lng], map.getZoom(), { animate: true });
+          m.openPopup();
+          map.once('moveend', function () { selecting = false; });
         });
-        var m = L.marker([it.lat, it.lng], { icon: icon }).addTo(layer);
-        m.bindPopup(
-          '<div class="tip" onclick="window.go(\\'' + it.id + '\\')">' +
-            '<div class="tip__name">' + it.name + '</div>' +
-            '<div class="tip__addr">' + it.address + '</div>' +
-            '<div class="tip__meta">' + it.meta + '</div>' +
-            '<div class="tip__cta">Λεπτομέρειες →</div>' +
-          '</div>',
-          { closeButton: false, autoClose: true, closeOnClick: true }
-        );
+        markers[it.id] = m;
       });
     };
     post({ type: 'ready' });
@@ -111,6 +151,7 @@ export function LeafletMap({
   results,
   onMarkerPress,
   onRegionChange,
+  onMapPress,
 }: MapProps) {
   const ref = useRef<WebView>(null)
   const html = useMemo(() => buildHtml(center), [])
@@ -124,11 +165,7 @@ export function LeafletMap({
         name: r.name,
         address: r.address,
         color: r.available ? colors.primary : '#9AA0A6',
-        meta:
-          (r.available ? 'Διαθέσιμο' : 'Πλήρες') +
-          ' · ' +
-          formatDistance(r.distanceMeters) +
-          (r.priceCents != null ? ' · ' + formatMoney(r.priceCents, r.currency) : ''),
+        meta: (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters),
       })),
     [results],
   )
@@ -196,6 +233,8 @@ export function LeafletMap({
         renderMarkers()
       } else if (msg.type === 'navigate' && msg.id) {
         onMarkerPress(msg.id)
+      } else if (msg.type === 'mappress') {
+        onMapPress()
       } else if (
         msg.type === 'region' &&
         msg.lat != null &&
