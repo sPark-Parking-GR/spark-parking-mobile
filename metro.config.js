@@ -1,15 +1,20 @@
-const { getDefaultConfig } = require('expo/metro-config')
-const path = require('path')
+const { getDefaultConfig } = require('expo/metro-config');
+const path = require('path');
 
-const projectRoot = __dirname
-const workspaceRoot = path.resolve(projectRoot, '../..')
+// Find the project root (where package.json for the app is)
+const projectRoot = __dirname;
+// Find the workspace root
+const workspaceRoot = path.resolve(projectRoot, '../..');
 
-const config = getDefaultConfig(projectRoot)
+const config = getDefaultConfig(projectRoot);
 
-config.watchFolders = [workspaceRoot]
+// 1. Watch all files within the monorepo
+config.watchFolders = [workspaceRoot];
+
+// 2. Let Metro look for dependencies in both local and workspace node_modules
 config.resolver.nodeModulesPaths = [
   path.resolve(projectRoot, 'node_modules'),
   path.resolve(workspaceRoot, 'node_modules'),
-]
+];
 
-module.exports = config
+module.exports = config;
