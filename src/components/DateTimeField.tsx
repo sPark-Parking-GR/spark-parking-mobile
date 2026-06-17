@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
 import { useEffect, useRef, useState } from 'react'
 import {
-  Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,
@@ -12,7 +11,7 @@ import {
 } from 'react-native'
 import { formatDateTimeShort } from '../lib/format'
 import { colors, font, radius, space } from '../theme'
-import { Button } from './ui'
+import { Sheet } from './Sheet'
 
 const MONTHS = [
   'Ιανουαρίου',
@@ -178,11 +177,6 @@ export function DateTimeField({
     return new Date(curYear, curMonth, snapped.getDate(), snapped.getHours(), snapped.getMinutes())
   }
 
-  function confirm() {
-    onChange(draft)
-    setOpen(false)
-  }
-
   // Day range: today → end of the current month.
   const minDay = min.getDate()
   const dayValues = range(minDay, daysInMonth(curYear, curMonth))
@@ -212,7 +206,9 @@ export function DateTimeField({
       parts.h ?? hour,
       parts.mi ?? minute,
     )
-    setDraft(next < min ? new Date(min) : next)
+    const clamped = next < min ? new Date(min) : next
+    setDraft(clamped)
+    onChange(clamped)
   }
 
   return (
@@ -233,11 +229,8 @@ export function DateTimeField({
         <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
       </Pressable>
 
-      <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
-        <View style={styles.backdrop}>
-          <View style={styles.sheet}>
-            <View style={styles.grip} />
-            <View style={styles.header}>
+      <Sheet open={open} onClose={() => setOpen(false)}>
+        <View style={styles.header}>
               <Text style={styles.headerLabel}>{label}</Text>
               <Text style={styles.headerValue}>{formatDateTimeShort(draft.toISOString())}</Text>
             </View>
@@ -294,18 +287,7 @@ export function DateTimeField({
                 </>
               )}
             </View>
-
-            <View style={styles.footer}>
-              <View style={styles.footerBtn}>
-                <Button label="Άκυρο" variant="secondary" onPress={() => setOpen(false)} />
-              </View>
-              <View style={styles.footerBtn}>
-                <Button label="Επιβεβαίωση" icon="checkmark" onPress={confirm} />
-              </View>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      </Sheet>
     </>
   )
 }
@@ -336,23 +318,6 @@ const styles = StyleSheet.create({
   label: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase' },
   value: { fontSize: font.small, color: colors.textMain, fontWeight: '600' },
 
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', justifyContent: 'flex-end' },
-  sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    paddingHorizontal: space.md,
-    paddingTop: space.sm,
-    paddingBottom: space.lg,
-    gap: space.md,
-  },
-  grip: {
-    width: 40,
-    height: 4,
-    borderRadius: 999,
-    backgroundColor: colors.border,
-    alignSelf: 'center',
-  },
   header: { alignItems: 'center', gap: 2 },
   headerLabel: {
     fontSize: 11,
@@ -411,7 +376,4 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(18,163,160,0.35)',
   },
   colon: { fontSize: font.heading, fontWeight: '700', color: colors.textMain, paddingHorizontal: 4 },
-
-  footer: { flexDirection: 'row', gap: space.sm },
-  footerBtn: { flex: 1 },
 })
