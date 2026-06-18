@@ -12,6 +12,7 @@ export interface FacilitySearchResult {
   priceCents: number | null
   currency: string
   isPromoted: boolean
+  rank: number
   thumbnailUrl: string | null
 }
 

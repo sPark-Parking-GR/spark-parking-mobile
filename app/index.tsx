@@ -1,17 +1,25 @@
 import { Ionicons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
-import { BottomSheet } from '../src/components/BottomSheet'
-import { defaultEnd, defaultStart, type BookingValue } from '../src/components/BookingForm'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { BottomSheet, type SortMode } from '../src/components/BottomSheet'
+import {
+  BookingForm,
+  defaultEnd,
+  defaultStart,
+  type BookingValue,
+} from '../src/components/BookingForm'
+import { Sheet } from '../src/components/Sheet'
+import { Button } from '../src/components/ui'
 import { computeDistanceMeters } from '@parqin/maps'
 import { Map } from '../src/components/map'
 import type { MapBounds, MapRegion } from '../src/components/map'
 import { searchFacilities, type FacilitySearchResult } from '../src/lib/api'
-import { FALLBACK_CENTER } from '../src/lib/constants'
+import { FALLBACK_CENTER, VEHICLE_TYPES } from '../src/lib/constants'
+import { formatDateTimeShort } from '../src/lib/format'
 import { useUserLocation } from '../src/lib/location'
 import { useDebouncedCallback } from '../src/lib/useDebouncedCallback'
-import { colors, space } from '../src/theme'
+import { colors, font, space } from '../src/theme'
 
 const MIN_RADIUS = 300
 const MAX_RADIUS = 50_000
@@ -58,7 +66,10 @@ function defaultWindow(): BookingValue {
 export default function HomeScreen() {
   const { coords, status, retry } = useUserLocation()
 
-  const [applied] = useState<BookingValue>(defaultWindow)
+  const [applied, setApplied] = useState<BookingValue>(defaultWindow)
+  const [sortMode, setSortMode] = useState<SortMode>('nearby')
+  const [costSheetOpen, setCostSheetOpen] = useState(false)
+  const [costDraft, setCostDraft] = useState<BookingValue>(applied)
   const [center, setCenter] = useState(FALLBACK_CENTER)
   const [centerNonce, setCenterNonce] = useState(0)
   const [viewport, setViewport] = useState<MapRegion | null>(null)
@@ -175,11 +186,39 @@ export default function HomeScreen() {
   }, [results, coords])
 
   // The list shows only spots inside the current viewport — the over-fetched ring
-  // stays on the map but out of the list.
-  const listResults = useMemo(
-    () => (visibleBounds ? mapResults.filter((r) => within(visibleBounds, r)) : mapResults),
-    [mapResults, visibleBounds],
-  )
+  // stays on the map but out of the list. Ordered by the active sort: cheapest
+  // first (cost preference, unpriced last) or stored rank then distance.
+  const listResults = useMemo(() => {
+    const base = visibleBounds ? mapResults.filter((r) => within(visibleBounds, r)) : mapResults
+    const sorted = [...base]
+    if (sortMode === 'cost') {
+      sorted.sort((a, b) => {
+        if (a.priceCents == null || b.priceCents == null) {
+          if (a.priceCents == null && b.priceCents == null) return a.distanceMeters - b.distanceMeters
+          return a.priceCents == null ? 1 : -1
+        }
+        if (a.priceCents !== b.priceCents) return a.priceCents - b.priceCents
+        return a.distanceMeters - b.distanceMeters
+      })
+    } else {
+      sorted.sort((a, b) =>
+        a.rank !== b.rank ? b.rank - a.rank : a.distanceMeters - b.distanceMeters,
+      )
+    }
+    return sorted
+  }, [mapResults, visibleBounds, sortMode])
+
+  const costLabel = useMemo(() => {
+    if (sortMode !== 'cost') return null
+    const vehicle = VEHICLE_TYPES.find((v) => v.value === applied.vehicleType)?.label ?? ''
+    return `Κόστος: ${formatDateTimeShort(applied.startsAt)} · ${vehicle}`
+  }, [sortMode, applied.startsAt, applied.vehicleType])
+
+  const applyCostSort = useCallback(() => {
+    setApplied(costDraft)
+    setSortMode('cost')
+    setCostSheetOpen(false)
+  }, [costDraft])
 
   const onRegionChange = useDebouncedCallback((region: MapRegion) => {
     // Always track the visible area so the list shows only in-view spots, even
@@ -249,7 +288,20 @@ export default function HomeScreen() {
         error={error}
         onSelect={openFacility}
         collapse={collapseNonce}
+        sortMode={sortMode}
+        onSortNearby={() => setSortMode('nearby')}
+        onSortCost={() => setCostSheetOpen(true)}
+        costLabel={costLabel}
       />
+
+      <Sheet open={costSheetOpen} onClose={() => setCostSheetOpen(false)}>
+        <Text style={styles.costTitle}>Ταξινόμηση κατά κόστος</Text>
+        <Text style={styles.costSub}>
+          Διάλεξε ώρα και όχημα για να δεις το ελάχιστο κόστος στάθμευσης.
+        </Text>
+        <BookingForm initial={applied} onChange={setCostDraft} />
+        <Button label="Εφαρμογή" icon="pricetag-outline" onPress={applyCostSort} />
+      </Sheet>
     </View>
   )
 }
@@ -273,4 +325,6 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabPressed: { opacity: 0.85 },
+  costTitle: { fontSize: font.heading, fontWeight: '700', color: colors.textMain },
+  costSub: { fontSize: font.small, color: colors.textSecondary, marginTop: -space.sm },
 })

@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { StyleSheet, Text, useWindowDimensions, View, type ListRenderItem } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
 import Animated, {
+  Extrapolation,
+  interpolate,
   runOnJS,
   scrollTo,
   useAnimatedRef,
@@ -13,6 +15,14 @@ import Animated, {
 import type { FacilitySearchResult } from '../lib/api'
 import { colors, font, radius, space } from '../theme'
 import { FacilityCard } from './FacilityCard'
+import { SegmentedControl, type Segment } from './SegmentedControl'
+
+export type SortMode = 'nearby' | 'cost'
+
+const SORT_SEGMENTS: Segment[] = [
+  { value: 'nearby', label: 'Κοντινά', icon: 'map-marker-distance' },
+  { value: 'cost', label: 'Φθηνότερα', icon: 'cash' },
+]
 
 const PEEK = 132
 const TAP_THRESHOLD = 8
@@ -27,6 +37,10 @@ export function BottomSheet({
   error,
   onSelect,
   collapse,
+  sortMode,
+  onSortNearby,
+  onSortCost,
+  costLabel,
 }: {
   results: FacilitySearchResult[]
   loading: boolean
@@ -34,6 +48,12 @@ export function BottomSheet({
   onSelect: (id: string) => void
   // Bump to collapse the sheet to its peek position (e.g. on empty-map tap).
   collapse: number
+  sortMode: SortMode
+  onSortNearby: () => void
+  // Opens the cost-order sheet (date/time/vehicle) and switches to cost sort.
+  onSortCost: () => void
+  // Active cost window summary, shown under the chips while sorting by cost.
+  costLabel?: string | null
 }) {
   const { height: screenH } = useWindowDimensions()
   const fullH = Math.round(screenH * 0.85)
@@ -146,6 +166,16 @@ export function BottomSheet({
 
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: ty.value }] }))
 
+  // Reveal the sort row by clipping its measured height in step with the sheet:
+  // full height once lifted off the peek detent, zero when collapsed — so list
+  // items sit directly under the header instead of an empty gap. Height-only (no
+  // opacity) keeps the active segment's elevation shadow from flickering.
+  const sortContentH = useSharedValue(0)
+  const sortStyle = useAnimatedStyle(() => {
+    const p = interpolate(ty.value, [halfY, peekY], [1, 0], Extrapolation.CLAMP)
+    return { height: sortContentH.value * p }
+  })
+
   const keyExtractor = useCallback((item: FacilitySearchResult) => item.id, [])
   const renderItem = useCallback<ListRenderItem<FacilitySearchResult>>(
     ({ item }) => <FacilityCard result={item} onSelect={onSelect} />,
@@ -178,6 +208,28 @@ export function BottomSheet({
           </View>
         </View>
       </GestureDetector>
+
+      {!error && (
+        <Animated.View style={[styles.sortClip, sortStyle]} pointerEvents={expanded ? 'auto' : 'none'}>
+          <View
+            style={styles.sortRow}
+            onLayout={(e) => {
+              sortContentH.value = e.nativeEvent.layout.height
+            }}
+          >
+            <SegmentedControl
+              segments={SORT_SEGMENTS}
+              value={sortMode}
+              onChange={(v) => (v === 'cost' ? onSortCost() : onSortNearby())}
+            />
+            {sortMode === 'cost' && costLabel ? (
+              <Text style={styles.sortCaption} numberOfLines={1}>
+                {costLabel}
+              </Text>
+            ) : null}
+          </View>
+        </Animated.View>
+      )}
 
       <GestureDetector gesture={Gesture.Simultaneous(listPan, listScroll)}>
         <Animated.FlatList
@@ -235,6 +287,9 @@ const styles = StyleSheet.create({
   },
   title: { fontSize: font.body, fontWeight: '600', color: colors.textMain, flexShrink: 1 },
   hint: { fontSize: font.tiny, color: colors.textSecondary },
+  sortClip: { overflow: 'hidden' },
+  sortRow: { paddingHorizontal: space.md, paddingBottom: space.sm, gap: 6 },
+  sortCaption: { fontSize: font.tiny, color: colors.textSecondary, paddingHorizontal: 2 },
   body: { flex: 1 },
   bodyContent: { padding: space.md, paddingTop: space.xs },
   skeleton: {
