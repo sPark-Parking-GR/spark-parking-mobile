@@ -7,6 +7,101 @@ import { getFacility, getQuote, type FacilityDetail, type PriceQuote } from '../
 import { formatMoney, formatTimeRange } from '../../src/lib/format'
 import { colors, font, space } from '../../src/theme'
 
+function minuteToHHMM(minute: number): string {
+  const h = Math.floor(minute / 60) % 24
+  const m = minute % 60
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function centsToCurrency(cents: number): string {
+  return formatMoney(cents, 'EUR')
+}
+
+type TariffPlan = FacilityDetail['tariffPlans'][number]
+
+function PricingCard({ plans }: { plans: FacilityDetail['tariffPlans'] }) {
+  const plan: TariffPlan | undefined =
+    plans.find((p) => p.isDefault) ?? plans[0]
+
+  if (!plan || plan.tiers.length === 0) return null
+
+  const windowById = new Map(plan.windows.map((w) => [w.id, w]))
+  const dailyCap = plan.caps.find((c) => c.windowMinutes === 1440)
+
+  return (
+    <Card style={styles.card}>
+      <Text style={styles.cardTitle}>Τιμολόγηση</Text>
+      {plan.windows.length > 0 && (
+        <View style={styles.pricingSection}>
+          {plan.windows.map((w) => (
+            <Text key={w.id} style={styles.windowLabel}>
+              {w.label}: {minuteToHHMM(w.startMinute)}–{minuteToHHMM(w.endMinute)}
+            </Text>
+          ))}
+        </View>
+      )}
+      {plan.tiers.map((tier) => {
+        const rangeLabel =
+          tier.toMinute != null
+            ? `${tier.fromMinute}–${tier.toMinute} λεπτά`
+            : `${tier.fromMinute}+ λεπτά`
+
+        if (tier.rates.length === 0) return null
+
+        if (tier.rates.length === 1) {
+          const rate = tier.rates[0]!
+          const unitSuffix =
+            tier.unit === 'FLAT'
+              ? ''
+              : tier.unit === 'PER_BLOCK' && tier.blockMinutes != null
+                ? `/${tier.blockMinutes} λεπτά`
+                : '/λεπτό'
+          return (
+            <View key={tier.id} style={styles.row}>
+              <Text style={styles.rowLabel}>{rangeLabel}:</Text>
+              <Text style={styles.rowValue}>
+                {centsToCurrency(rate.priceCents)}{unitSuffix}
+              </Text>
+            </View>
+          )
+        }
+
+        return (
+          <View key={tier.id}>
+            <Text style={styles.rowLabel}>{rangeLabel}:</Text>
+            {tier.rates.map((rate) => {
+              const win = windowById.get(rate.windowId)
+              const unitSuffix =
+                tier.unit === 'FLAT'
+                  ? ''
+                  : tier.unit === 'PER_BLOCK' && tier.blockMinutes != null
+                    ? `/${tier.blockMinutes} λεπτά`
+                    : '/λεπτό'
+              return (
+                <View key={rate.id} style={[styles.row, styles.rowIndent]}>
+                  <Text style={styles.rowLabel}>{win?.label ?? rate.windowId}</Text>
+                  <Text style={styles.rowValue}>
+                    {centsToCurrency(rate.priceCents)}{unitSuffix}
+                  </Text>
+                </View>
+              )
+            })}
+          </View>
+        )
+      })}
+      {dailyCap && (
+        <>
+          <View style={styles.divider} />
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Μέγιστο/ημέρα:</Text>
+            <Text style={styles.rowValue}>{centsToCurrency(dailyCap.capCents)}</Text>
+          </View>
+        </>
+      )}
+    </Card>
+  )
+}
+
 export default function FacilityScreen() {
   const params = useLocalSearchParams<{
     id: string
@@ -142,6 +237,8 @@ export default function FacilityScreen() {
           </Text>
         )}
       </Card>
+
+      <PricingCard plans={facility.tariffPlans} />
     </ScrollView>
   )
 }
@@ -164,4 +261,7 @@ const styles = StyleSheet.create({
   muted: { color: colors.textSecondary, fontSize: font.small },
   policy: { fontSize: font.small, color: colors.textSecondary, marginTop: space.sm },
   error: { color: colors.error, fontSize: font.body, textAlign: 'center', paddingHorizontal: space.lg },
+  pricingSection: { marginBottom: space.sm },
+  windowLabel: { fontSize: font.small, color: colors.textSecondary, marginBottom: 2 },
+  rowIndent: { paddingLeft: space.sm },
 })

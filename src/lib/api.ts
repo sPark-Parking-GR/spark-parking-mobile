@@ -52,7 +52,33 @@ export interface FacilityDetail {
   tariffPlans: Array<{
     id: string
     name: string
-    rules: Array<{ id: string; type: string; priceCents: number; currency: string; vehicleTypes: string[] }>
+    isDefault: boolean
+    timezone: string
+    graceMinutes: number
+    incrementMinutes: number
+    version: number
+    vehicleTypes: string[]
+    tiers: Array<{
+      id: string
+      fromMinute: number
+      toMinute: number | null
+      unit: string
+      blockMinutes: number | null
+      rates: Array<{ id: string; windowId: string; priceCents: number; currency: string }>
+    }>
+    windows: Array<{
+      id: string
+      label: string
+      dayMask: number
+      startMinute: number
+      endMinute: number
+    }>
+    caps: Array<{
+      id: string
+      windowMinutes: number
+      capCents: number
+      scope: string
+    }>
   }>
   rating: { average: number | null; count: number }
 }
