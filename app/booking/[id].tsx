@@ -79,7 +79,11 @@ export default function TicketScreen() {
       </Card>
 
       <View style={styles.cta}>
-        <Button label="Νέα αναζήτηση" variant="secondary" onPress={() => router.replace('/')} />
+        <Button
+          label="Νέα αναζήτηση"
+          variant="secondary"
+          onPress={() => (router.canDismiss() ? router.dismissAll() : router.replace('/'))}
+        />
       </View>
     </ScrollView>
   )
