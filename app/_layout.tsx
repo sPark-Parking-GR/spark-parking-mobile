@@ -20,8 +20,6 @@ export default function RootLayout() {
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="facility/[id]" options={{ title: 'Χώρος στάθμευσης' }} />
-          <Stack.Screen name="checkout" options={{ title: 'Κράτηση' }} />
-          <Stack.Screen name="booking/[id]" options={{ title: 'Το εισιτήριό σου' }} />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

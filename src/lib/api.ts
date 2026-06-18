@@ -57,41 +57,6 @@ export interface FacilityDetail {
   rating: { average: number | null; count: number }
 }
 
-export interface CreateBookingResponse {
-  bookingId: string
-  accessCode: string
-  expiresAt: string
-  amountCents: number
-  currency: string
-  clientSecret?: string
-  alreadyExisted: boolean
-}
-
-export interface ConfirmedBooking {
-  bookingId: string
-  accessCode: string
-  status: string
-  startsAt: string
-  endsAt: string
-  finalPriceCents: number
-  currency: string
-}
-
-export interface BookingDetail {
-  id: string
-  accessCode: string
-  status: string
-  startsAt: string
-  endsAt: string
-  vehiclePlate: string
-  vehicleType: string
-  quotedPriceCents: number
-  finalPriceCents: number | null
-  currency: string
-  facility: { id: string; name: string; address: string }
-  statusHistory: Array<{ status: string; changedAt: string }>
-}
-
 export interface SearchParams {
   lat: number
   lng: number
@@ -160,31 +125,4 @@ export function getQuote(
 ): Promise<PriceQuote> {
   const query = new URLSearchParams({ startsAt, endsAt, vehicleType })
   return request<PriceQuote>(`/facilities/${id}/quote?${query.toString()}`)
-}
-
-export function createBooking(
-  body: {
-    facilityId: string
-    startsAt: string
-    endsAt: string
-    vehicleType: string
-    vehiclePlate: string
-    guestEmail: string
-    guestPhone?: string
-  },
-  idempotencyKey: string,
-): Promise<CreateBookingResponse> {
-  return request<CreateBookingResponse>('/bookings', {
-    method: 'POST',
-    headers: { 'Idempotency-Key': idempotencyKey },
-    body: JSON.stringify({ ...body, sourceChannel: 'MOBILE' }),
-  })
-}
-
-export function confirmBooking(id: string): Promise<ConfirmedBooking> {
-  return request<ConfirmedBooking>(`/bookings/${id}/confirm`, { method: 'POST' })
-}
-
-export function getBooking(id: string): Promise<BookingDetail> {
-  return request<BookingDetail>(`/bookings/${id}`)
 }

@@ -1,8 +1,8 @@
-import { router, useLocalSearchParams } from 'expo-router'
+import { useLocalSearchParams } from 'expo-router'
 import { useEffect, useState } from 'react'
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { BookingForm, type BookingValue } from '../../src/components/BookingForm'
-import { Badge, Button, Card } from '../../src/components/ui'
+import { Badge, Card } from '../../src/components/ui'
 import { getFacility, getQuote, type FacilityDetail, type PriceQuote } from '../../src/lib/api'
 import { formatMoney, formatTimeRange } from '../../src/lib/format'
 import { colors, font, space } from '../../src/theme'
@@ -60,20 +60,6 @@ export default function FacilityScreen() {
       cancelled = true
     }
   }, [params.id, booking?.startsAt, booking?.endsAt, booking?.vehicleType])
-
-  function book() {
-    if (!quote || !facility || !booking) return
-    router.push({
-      pathname: '/checkout',
-      params: {
-        facilityId: facility.id,
-        name: facility.name,
-        startsAt: booking.startsAt,
-        endsAt: booking.endsAt,
-        vehicleType: booking.vehicleType,
-      },
-    })
-  }
 
   if (loading) {
     return (
@@ -156,12 +142,6 @@ export default function FacilityScreen() {
           </Text>
         )}
       </Card>
-
-      {quote ? (
-        <View style={styles.cta}>
-          <Button label="Κράτηση" onPress={book} />
-        </View>
-      ) : null}
     </ScrollView>
   )
 }
@@ -184,5 +164,4 @@ const styles = StyleSheet.create({
   muted: { color: colors.textSecondary, fontSize: font.small },
   policy: { fontSize: font.small, color: colors.textSecondary, marginTop: space.sm },
   error: { color: colors.error, fontSize: font.body, textAlign: 'center', paddingHorizontal: space.lg },
-  cta: { marginTop: space.lg },
 })
