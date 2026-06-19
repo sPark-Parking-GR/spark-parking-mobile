@@ -11,7 +11,7 @@ import {
 } from '../src/components/BookingForm'
 import { Sheet } from '../src/components/Sheet'
 import { Button } from '../src/components/ui'
-import { computeDistanceMeters } from '@parqin/maps'
+import { computeDistanceMeters } from '@spark/maps'
 import { Map } from '../src/components/map'
 import type { MapBounds, MapRegion } from '../src/components/map'
 import { searchFacilities, type FacilitySearchResult } from '../src/lib/api'

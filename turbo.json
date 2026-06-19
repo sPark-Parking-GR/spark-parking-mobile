@@ -1,0 +1,8 @@
+{
+  "extends": ["//"],
+  "tasks": {
+    "dev": {
+      "with": ["@spark/api#dev"]
+    }
+  }
+}

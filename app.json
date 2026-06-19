@@ -1,19 +1,19 @@
 {
   "expo": {
-    "name": "Parqin",
-    "slug": "parqin",
+    "name": "sPark",
+    "slug": "spark",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "scheme": "parqin",
+    "scheme": "spark",
     "userInterfaceStyle": "light",
     "backgroundColor": "#f9f8f6",
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.parqin.app"
+      "bundleIdentifier": "com.spark.app"
     },
     "android": {
-      "package": "com.parqin.app",
+      "package": "com.spark.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#f9f8f6"
@@ -29,7 +29,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Το Parqin χρησιμοποιεί την τοποθεσία σου για να βρει χώρους στάθμευσης κοντά σου."
+          "locationWhenInUsePermission": "Το sPark χρησιμοποιεί την τοποθεσία σου για να βρει χώρους στάθμευσης κοντά σου."
         }
       ]
     ],
@@ -39,8 +39,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "ee6ed6f8-542a-4ee2-9752-922b9c964674"
+        "projectId": "b2867f47-0b04-4a91-b124-41e11c46a1ab"
       }
-    }
+    },
+    "owner": "kostasthomson"
   }
 }
