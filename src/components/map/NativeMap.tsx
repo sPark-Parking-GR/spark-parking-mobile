@@ -1,6 +1,6 @@
 import { useEffect, useRef, type ElementRef } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import MapView, { Callout, Marker, type Region } from 'react-native-maps'
+import MapView, { Callout, Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps'
 import type { FacilitySearchResult } from '../../lib/api'
 import { formatDistance } from '../../lib/format'
 import { colors, font } from '../../theme'
@@ -105,6 +105,7 @@ export function NativeMap({
   return (
     <MapView
       ref={ref}
+      provider={PROVIDER_GOOGLE}
       style={styles.fill}
       initialRegion={region}
       showsUserLocation
