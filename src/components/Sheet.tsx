@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useState } from 'react'
 import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
-import { Gesture, GestureDetector } from 'react-native-gesture-handler'
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
 import Animated, {
   Easing,
   runOnJS,
@@ -50,6 +50,7 @@ export function Sheet({
   }, [open])
 
   const pan = Gesture.Pan()
+    .hitSlop({ top: 8, bottom: 24, left: 80, right: 80 })
     .onUpdate((e) => {
       ty.value = Math.max(0, e.translationY)
     })
@@ -68,27 +69,30 @@ export function Sheet({
 
   return (
     <Modal visible transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
-      <Animated.View style={[styles.backdrop, backdropStyle]}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-        <Animated.View
-          style={[styles.sheet, sheetStyle]}
-          onLayout={(e) => {
-            sheetH.value = e.nativeEvent.layout.height
-          }}
-        >
-          <GestureDetector gesture={pan}>
-            <View style={styles.handle}>
-              <View style={styles.grip} />
-            </View>
-          </GestureDetector>
-          {children}
+      <GestureHandlerRootView style={styles.root}>
+        <Animated.View style={[styles.backdrop, backdropStyle]}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+          <Animated.View
+            style={[styles.sheet, sheetStyle]}
+            onLayout={(e) => {
+              sheetH.value = e.nativeEvent.layout.height
+            }}
+          >
+            <GestureDetector gesture={pan}>
+              <View style={styles.handle}>
+                <View style={styles.grip} />
+              </View>
+            </GestureDetector>
+            {children}
+          </Animated.View>
         </Animated.View>
-      </Animated.View>
+      </GestureHandlerRootView>
     </Modal>
   )
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
   sheet: {
     backgroundColor: colors.surface,
