@@ -4,7 +4,7 @@ import MapView, { Callout, Marker, type Region } from 'react-native-maps'
 import type { FacilitySearchResult } from '../../lib/api'
 import { formatDistance } from '../../lib/format'
 import { colors, font } from '../../theme'
-import { LogoMark } from './logo'
+import { MapPin, PIN_ANCHOR } from './logo'
 import type { MapProps } from './types'
 
 function metaLine(r: FacilitySearchResult): string {
@@ -12,6 +12,23 @@ function metaLine(r: FacilitySearchResult): string {
     (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters)
   )
 }
+
+// Dark basemap (Google, Android) tuned to the navy brand canvas.
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#0a1721' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8a96a0' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#020c14' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#1f3340' }] },
+  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#6b7780' }] },
+  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#0d2016' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#16242e' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#0c1a24' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#24333d' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#0a6a99' }] },
+  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#15252f' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#020c14' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3a4b56' }] },
+]
 
 const DELTA = 0.04
 // Floor on the fitted span so a user standing next to a parking doesn't zoom to street level.
@@ -91,6 +108,8 @@ export function NativeMap({
       style={styles.fill}
       initialRegion={region}
       showsUserLocation
+      customMapStyle={DARK_MAP_STYLE}
+      userInterfaceStyle="dark"
       onRegionChangeComplete={handleRegion}
       onPress={(e) => {
         if (e.nativeEvent.action === 'marker-press') return
@@ -109,7 +128,7 @@ export function NativeMap({
           }}
           coordinate={{ latitude: r.lat, longitude: r.lng }}
           tracksViewChanges={false}
-          anchor={{ x: 0.5, y: 1 }}
+          anchor={PIN_ANCHOR}
           onPress={async () => {
             selectedId.current = r.id
             calloutOpen.current = true
@@ -124,13 +143,7 @@ export function NativeMap({
             ref.current?.animateCamera({ center: { latitude: r.lat, longitude: r.lng } }, { duration: 350 })
           }}
         >
-          <View style={styles.marker}>
-            <View style={[styles.pin, { backgroundColor: r.available ? colors.primary : '#9AA0A6' }]}>
-              <View style={styles.pinInner}>
-                <LogoMark size={16} color="#fff" />
-              </View>
-            </View>
-          </View>
+          <MapPin available={r.available} />
           <Callout onPress={() => onMarkerPress(r.id)}>
             <View style={styles.callout}>
               <Text style={styles.calloutName}>{r.name}</Text>
@@ -147,26 +160,6 @@ export function NativeMap({
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  marker: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  pin: {
-    width: 34,
-    height: 34,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-    borderTopLeftRadius: 17,
-    borderTopRightRadius: 17,
-    borderBottomRightRadius: 0,
-    borderBottomLeftRadius: 17,
-    transform: [{ rotate: '45deg' }],
-    shadowColor: '#000',
-    shadowOpacity: 0.22,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
-  },
-  pinInner: { transform: [{ rotate: '-45deg' }] },
   callout: { minWidth: 180, paddingVertical: 2, gap: 2 },
   calloutName: { fontSize: 14, fontWeight: '600', color: colors.textMain },
   calloutAddr: { fontSize: font.tiny, color: colors.textSecondary },

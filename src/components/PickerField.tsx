@@ -84,7 +84,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.sm,
     backgroundColor: colors.surface,
   },
-  pressed: { borderColor: colors.primary, backgroundColor: '#f4fbfb' },
+  pressed: { borderColor: colors.primary, backgroundColor: colors.primaryTint },
   iconBox: {
     width: 36,
     height: 36,

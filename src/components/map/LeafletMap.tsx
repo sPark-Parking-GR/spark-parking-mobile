@@ -3,12 +3,8 @@ import { StyleSheet, View } from 'react-native'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
 import { formatDistance } from '../../lib/format'
 import { colors } from '../../theme'
-import { LOGO_PATHS, LOGO_VIEWBOX } from './logo'
+import { PIN_ANCHOR, PIN_SIZE, pinSvgMarkup } from './logo'
 import type { MapProps } from './types'
-
-const LOGO_SVG = `<svg width="17" height="21" viewBox="${LOGO_VIEWBOX}">${LOGO_PATHS.map(
-  (d) => `<path fill="#fff" d="${d}"/>`,
-).join('')}</svg>`
 
 function buildHtml(center: { lat: number; lng: number }): string {
   return `<!DOCTYPE html>
@@ -19,17 +15,15 @@ function buildHtml(center: { lat: number; lng: number }): string {
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: ${colors.bg}; }
-    .marker { position: relative; width: 48px; height: 48px; transform: translate(-50%, -100%); }
-    .pin { position: absolute; left: 7px; top: 7px; width: 34px; height: 34px;
-      display: flex; align-items: center; justify-content: center; border: 1.5px solid #fff;
-      border-radius: 50% 50% 0 50%; transform: rotate(45deg); box-shadow: 0 2px 6px rgba(0,0,0,.22); }
-    .pin__inner { transform: rotate(-45deg); line-height: 0; }
+    .pin { filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); line-height: 0; }
     .leaflet-popup-content { margin: 10px 12px; }
-    .leaflet-popup-content-wrapper { border-radius: 14px; cursor: pointer; }
+    .leaflet-popup-content-wrapper { border-radius: 14px; cursor: pointer;
+      background: ${colors.surface}; color: ${colors.textMain}; border: 1px solid ${colors.border}; }
+    .leaflet-popup-tip { background: ${colors.surface}; }
     .tip { min-width: 170px; }
-    .tip__name { font: 600 14px system-ui, sans-serif; color: #1F2933; }
-    .tip__addr { font-size: 12px; color: #6B727A; margin: 2px 0 6px; }
-    .tip__meta { font-size: 13px; color: #1F2933; margin-bottom: 6px; }
+    .tip__name { font: 600 14px system-ui, sans-serif; color: ${colors.textMain}; }
+    .tip__addr { font-size: 12px; color: ${colors.textSecondary}; margin: 2px 0 6px; }
+    .tip__meta { font-size: 13px; color: ${colors.textMain}; margin-bottom: 6px; }
     .tip__cta { font: 600 13px system-ui, sans-serif; color: ${colors.primary}; }
     .user-dot { width: 18px; height: 18px; border-radius: 50%; background: #1A73E8;
       border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(26,115,232,.35), 0 1px 4px rgba(0,0,0,.3);
@@ -41,8 +35,8 @@ function buildHtml(center: { lat: number; lng: number }): string {
   <script>
     var DEFAULT_ZOOM = 14;
     var map = L.map('map', { zoomControl: false }).setView([${center.lat}, ${center.lng}], DEFAULT_ZOOM);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap'
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20
     }).addTo(map);
     var layer = L.layerGroup().addTo(map);
     function post(msg) {
@@ -82,15 +76,15 @@ function buildHtml(center: { lat: number; lng: number }): string {
     }
     map.on('moveend', postRegion);
     map.whenReady(postRegion);
-    function makeIcon(color) {
+    var PIN_AVAIL = ${JSON.stringify(pinSvgMarkup(true))};
+    var PIN_FULL = ${JSON.stringify(pinSvgMarkup(false))};
+    var PIN_SIZE = [${PIN_SIZE.width}, ${PIN_SIZE.height}];
+    var PIN_ANCHOR = [${PIN_SIZE.width * PIN_ANCHOR.x}, ${PIN_SIZE.height * PIN_ANCHOR.y}];
+    function makeIcon(available) {
       return L.divIcon({
         className: '',
-        html: '<div class="marker">' +
-                '<div class="pin" style="background:' + color + '">' +
-                  '<div class="pin__inner">' + ${JSON.stringify(LOGO_SVG)} + '</div>' +
-                '</div>' +
-              '</div>',
-        iconSize: [0, 0], iconAnchor: [0, 0]
+        html: '<div class="pin">' + (available ? PIN_AVAIL : PIN_FULL) + '</div>',
+        iconSize: PIN_SIZE, iconAnchor: PIN_ANCHOR
       });
     }
     function popupHtml(it) {
@@ -114,12 +108,12 @@ function buildHtml(center: { lat: number; lng: number }): string {
         var m = markers[it.id];
         if (m) {
           m.setLatLng([it.lat, it.lng]);
-          if (m._color !== it.color) { m.setIcon(makeIcon(it.color)); m._color = it.color; }
+          if (m._available !== it.available) { m.setIcon(makeIcon(it.available)); m._available = it.available; }
           m.setPopupContent(popupHtml(it));
           return;
         }
-        m = L.marker([it.lat, it.lng], { icon: makeIcon(it.color) }).addTo(layer);
-        m._color = it.color;
+        m = L.marker([it.lat, it.lng], { icon: makeIcon(it.available) }).addTo(layer);
+        m._available = it.available;
         m.bindPopup(popupHtml(it), { closeButton: false, autoClose: true, closeOnClick: true, autoPan: false });
         m.on('click', function () {
           post({ type: 'spotpress' });
@@ -166,7 +160,7 @@ export function LeafletMap({
         lng: r.lng,
         name: r.name,
         address: r.address,
-        color: r.available ? colors.primary : '#9AA0A6',
+        available: r.available,
         meta: (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters),
       })),
     [results],

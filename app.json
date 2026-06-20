@@ -1,13 +1,13 @@
 {
   "expo": {
     "name": "sPark",
-    "slug": "spark",
+    "slug": "spark-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "spark",
-    "userInterfaceStyle": "light",
-    "backgroundColor": "#f9f8f6",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#020C14",
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.spark.app"
@@ -16,7 +16,8 @@
       "package": "com.spark.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#f9f8f6"
+        "backgroundColor": "#020C14",
+        "package":"com.spark.app"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
