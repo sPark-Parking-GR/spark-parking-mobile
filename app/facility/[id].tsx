@@ -1,9 +1,11 @@
+import { Ionicons } from '@expo/vector-icons'
 import { useLocalSearchParams } from 'expo-router'
 import { useEffect, useState } from 'react'
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native'
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { BookingForm, type BookingValue } from '../../src/components/BookingForm'
 import { Badge, Card } from '../../src/components/ui'
 import { getFacility, getQuote, type FacilityDetail, type PriceQuote } from '../../src/lib/api'
+import { openDirections } from '../../src/lib/directions'
 import { formatMoney, formatTimeRange } from '../../src/lib/format'
 import { colors, font, space } from '../../src/theme'
 
@@ -175,7 +177,15 @@ export default function FacilityScreen() {
   return (
     <ScrollView contentContainerStyle={styles.content}>
       <Text style={styles.title}>{facility.name}</Text>
-      <Text style={styles.address}>{facility.address}</Text>
+      <Pressable
+        onPress={() =>
+          openDirections({ lat: facility.lat, lng: facility.lng, label: facility.name })
+        }
+        style={({ pressed }) => [styles.directions, pressed && styles.directionsPressed]}
+      >
+        <Ionicons name="navigate-circle" size={20} color={colors.primary} />
+        <Text style={styles.address}>{facility.address}</Text>
+      </Pressable>
       {facility.rating.average != null ? (
         <Text style={styles.rating}>
           ★ {facility.rating.average.toFixed(1)} ({facility.rating.count})
@@ -247,7 +257,9 @@ const styles = StyleSheet.create({
   content: { padding: space.md, paddingBottom: space.xl },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   title: { fontSize: 24, fontWeight: '600', color: colors.textMain },
-  address: { fontSize: font.body, color: colors.textSecondary, marginTop: 4 },
+  directions: { flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 4 },
+  directionsPressed: { opacity: 0.6 },
+  address: { fontSize: font.body, color: colors.primary, flexShrink: 1 },
   rating: { fontSize: font.small, color: colors.warning, marginTop: 6 },
   card: { marginTop: space.md },
   cardTitle: { fontSize: font.body, fontWeight: '600', color: colors.textMain, marginBottom: space.sm },

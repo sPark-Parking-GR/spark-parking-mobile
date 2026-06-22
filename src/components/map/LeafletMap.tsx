@@ -27,7 +27,9 @@ function buildHtml(center: { lat: number; lng: number }): string {
     .tip__name { font: 600 14px system-ui, sans-serif; color: ${colors.textMain}; }
     .tip__addr { font-size: 12px; color: ${colors.textSecondary}; margin: 2px 0 6px; }
     .tip__meta { font-size: 13px; color: ${colors.textMain}; margin-bottom: 6px; }
-    .tip__cta { font: 600 13px system-ui, sans-serif; color: ${colors.primary}; }
+    .tip__actions { display: flex; align-items: center; gap: 12px; }
+    .tip__cta { font: 600 13px system-ui, sans-serif; color: ${colors.primary}; cursor: pointer; }
+    .tip__dir { border-left: 1px solid ${colors.border}; padding-left: 12px; }
     .user-dot { width: 18px; height: 18px; border-radius: 50%; background: ${colors.primary};
       border: 3px solid ${colors.surface}; box-shadow: 0 0 0 2px ${colors.primaryTintBorder}, 0 1px 4px rgba(0,0,0,.3);
       transform: translate(-50%, -50%); }
@@ -57,6 +59,7 @@ function buildHtml(center: { lat: number; lng: number }): string {
       else userMarker = L.marker([lat, lng], { icon: icon, interactive: false, zIndexOffset: 1000 }).addTo(map);
     };
     window.go = function (id) { post({ type: 'navigate', id: id }); };
+    window.dir = function (e, id) { e.stopPropagation(); post({ type: 'directions', id: id }); };
     // Suppress the close handler while we programmatically center on a tapped spot.
     var selecting = false;
     // ~1m: if the spot is already centered, skip the pan (and its refetch).
@@ -91,11 +94,14 @@ function buildHtml(center: { lat: number; lng: number }): string {
       });
     }
     function popupHtml(it) {
-      return '<div class="tip" onclick="window.go(\\'' + it.id + '\\')">' +
+      return '<div class="tip">' +
                '<div class="tip__name">' + it.name + '</div>' +
                '<div class="tip__addr">' + it.address + '</div>' +
                '<div class="tip__meta">' + it.meta + '</div>' +
-               '<div class="tip__cta">Λεπτομέρειες →</div>' +
+               '<div class="tip__actions">' +
+                 '<div class="tip__cta" onclick="window.go(\\'' + it.id + '\\')">Λεπτομέρειες →</div>' +
+                 '<div class="tip__cta tip__dir" onclick="window.dir(event, \\'' + it.id + '\\')">↗ Οδηγίες</div>' +
+               '</div>' +
              '</div>';
     }
     // Persistent markers keyed by id. Refetch reconciles in place so the tapped
@@ -148,6 +154,7 @@ export function LeafletMap({
   fitNonce,
   results,
   onMarkerPress,
+  onDirections,
   onRegionChange,
   onMapPress,
   onSpotSelect,
@@ -232,6 +239,8 @@ export function LeafletMap({
         renderMarkers()
       } else if (msg.type === 'navigate' && msg.id) {
         onMarkerPress(msg.id)
+      } else if (msg.type === 'directions' && msg.id) {
+        onDirections(msg.id)
       } else if (msg.type === 'mappress') {
         onMapPress()
       } else if (msg.type === 'spotpress') {

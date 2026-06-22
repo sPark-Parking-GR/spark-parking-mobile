@@ -15,6 +15,7 @@ import { computeDistanceMeters } from '@spark/maps'
 import { Map } from '../src/components/map'
 import type { MapBounds, MapRegion } from '../src/components/map'
 import { searchFacilities, type FacilitySearchResult } from '../src/lib/api'
+import { openDirections } from '../src/lib/directions'
 import { FALLBACK_CENTER, VEHICLE_TYPES } from '../src/lib/constants'
 import { formatDateTimeShort } from '../src/lib/format'
 import { useUserLocation } from '../src/lib/location'
@@ -258,6 +259,14 @@ export default function HomeScreen() {
     [applied.startsAt, applied.endsAt, applied.vehicleType],
   )
 
+  const navigateTo = useCallback(
+    (id: string) => {
+      const spot = results.find((r) => r.id === id)
+      if (spot) openDirections({ lat: spot.lat, lng: spot.lng, label: spot.name })
+    },
+    [results],
+  )
+
   return (
     <View style={styles.root}>
       <View style={StyleSheet.absoluteFill}>
@@ -269,6 +278,7 @@ export default function HomeScreen() {
           fitNonce={fitNonce}
           results={mapResults}
           onMarkerPress={openFacility}
+          onDirections={navigateTo}
           onRegionChange={onRegionChange}
           onUserGesture={() => {
             // A user gesture invalidates any search still queued for the

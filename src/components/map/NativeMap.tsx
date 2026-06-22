@@ -1,6 +1,13 @@
+import { Ionicons } from '@expo/vector-icons'
 import { useEffect, useRef, type ElementRef } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
-import MapView, { Callout, Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps'
+import MapView, {
+  Callout,
+  CalloutSubview,
+  Marker,
+  PROVIDER_GOOGLE,
+  type Region,
+} from 'react-native-maps'
 import type { FacilitySearchResult } from '../../lib/api'
 import { formatDistance } from '../../lib/format'
 import { colors, font, radius, space } from '../../theme'
@@ -45,6 +52,7 @@ export function NativeMap({
   fitNonce,
   results,
   onMarkerPress,
+  onDirections,
   onRegionChange,
   onUserGesture,
   onMapPress,
@@ -150,12 +158,23 @@ export function NativeMap({
           }}
         >
           <MapPin available={r.available} />
-          <Callout tooltip onPress={() => onMarkerPress(r.id)}>
+          <Callout tooltip>
             <View style={styles.callout}>
               <Text style={styles.calloutName}>{r.name}</Text>
               <Text style={styles.calloutAddr}>{r.address}</Text>
               <Text style={styles.calloutMeta}>{metaLine(r)}</Text>
-              <Text style={styles.calloutCta}>Λεπτομέρειες →</Text>
+              <View style={styles.calloutActions}>
+                <CalloutSubview style={styles.calloutBtn} onPress={() => onMarkerPress(r.id)}>
+                  <Text style={styles.calloutCta}>Λεπτομέρειες →</Text>
+                </CalloutSubview>
+                <CalloutSubview
+                  style={[styles.calloutBtn, styles.calloutBtnDirections]}
+                  onPress={() => onDirections(r.id)}
+                >
+                  <Ionicons name="navigate" size={14} color={colors.primary} />
+                  <Text style={styles.calloutCta}>Οδηγίες</Text>
+                </CalloutSubview>
+              </View>
             </View>
           </Callout>
         </Marker>
@@ -184,6 +203,15 @@ const styles = StyleSheet.create({
   calloutName: { fontSize: 14, fontWeight: '600', color: colors.textMain },
   calloutAddr: { fontSize: font.tiny, color: colors.textSecondary },
   calloutMeta: { fontSize: font.small, color: colors.textMain, marginTop: 2 },
-  calloutCta: { fontSize: font.small, fontWeight: '600', color: colors.primary, marginTop: 4 },
+  calloutActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.md,
+    marginTop: space.sm,
+  },
+  calloutBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2 },
+  calloutBtnDirections: { borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: space.md },
+  calloutCta: { fontSize: font.small, fontWeight: '600', color: colors.primary },
 })
 

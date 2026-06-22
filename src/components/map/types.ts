@@ -26,6 +26,8 @@ export interface MapProps {
   fitNonce: number
   results: FacilitySearchResult[]
   onMarkerPress: (id: string) => void
+  // A spot's directions button was tapped — hand the spot off to a maps app.
+  onDirections: (id: string) => void
   onRegionChange: (region: MapRegion) => void
   // The user started moving the map (gesture only, not a programmatic camera
   // move). Fires once at gesture start, so location-lock UI reacts without lag.
