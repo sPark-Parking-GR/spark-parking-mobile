@@ -1,7 +1,12 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { useEffect, useRef, useState } from 'react'
 import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated'
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated'
 import { colors, font, radius } from '../theme'
 
 const SPRING = { damping: 22, stiffness: 220, mass: 0.9 }
@@ -40,14 +45,16 @@ export function SegmentedControl({
     if (settled.current) {
       tx.value = withSpring(target, SPRING)
     } else {
-      tx.value = target
+      // Place instantly, but via withTiming so a UI-thread frame is scheduled —
+      // a bare assignment isn't flushed to a freshly mounted Modal view, leaving
+      // the indicator mispositioned until the first interaction.
+      tx.value = withTiming(target, { duration: 0 })
       settled.current = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index, segW])
 
   const indicatorStyle = useAnimatedStyle(() => ({
-    width: segW,
     transform: [{ translateX: tx.value }],
   }))
 
@@ -57,7 +64,7 @@ export function SegmentedControl({
 
   return (
     <View style={styles.track} onLayout={onLayout}>
-      {segW > 0 && <Animated.View style={[styles.indicator, indicatorStyle]} />}
+      {segW > 0 && <Animated.View style={[styles.indicator, { width: segW }, indicatorStyle]} />}
       {segments.map((s) => {
         const active = s.value === value
         return (
