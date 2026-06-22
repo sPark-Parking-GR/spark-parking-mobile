@@ -1,4 +1,4 @@
-import type { FacilitySearchResult } from '../../lib/api'
+import type { FacilityCluster, FacilitySearchResult } from '../../lib/api'
 
 export interface MapBounds {
   north: number
@@ -25,6 +25,10 @@ export interface MapProps {
   // Bump to (re)apply fitBounds even if the bounds are unchanged.
   fitNonce: number
   results: FacilitySearchResult[]
+  // Grid-aggregated clusters shown on zoomed-out views instead of points.
+  clusters: FacilityCluster[]
+  // Optional analytics hook on cluster tap; the zoom-in is handled in-renderer.
+  onClusterPress?: (cluster: FacilityCluster) => void
   onMarkerPress: (id: string) => void
   // A spot's directions button was tapped — hand the spot off to a maps app.
   onDirections: (id: string) => void

@@ -16,6 +16,20 @@ export interface FacilitySearchResult {
   thumbnailUrl: string | null
 }
 
+export interface FacilityCluster {
+  id: string
+  lat: number
+  lng: number
+  count: number
+}
+
+export interface FacilitySearchResponse {
+  mode: 'points' | 'clusters'
+  points: FacilitySearchResult[]
+  clusters: FacilityCluster[]
+  total: number
+}
+
 export interface QuoteLineItem {
   label: string
   durationMinutes: number
@@ -117,7 +131,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export function searchFacilities(
   params: SearchParams,
   opts?: { signal?: AbortSignal },
-): Promise<FacilitySearchResult[]> {
+): Promise<FacilitySearchResponse> {
   const query = new URLSearchParams({
     lat: String(params.lat),
     lng: String(params.lng),
@@ -134,7 +148,7 @@ export function searchFacilities(
       : {}),
     ...(params.vehicleType ? { vehicleType: params.vehicleType } : {}),
   })
-  return request<FacilitySearchResult[]>(`/facilities/search?${query.toString()}`, {
+  return request<FacilitySearchResponse>(`/facilities/search?${query.toString()}`, {
     signal: opts?.signal as RequestInit['signal'],
   })
 }

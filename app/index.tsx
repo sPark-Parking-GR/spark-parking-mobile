@@ -11,10 +11,10 @@ import {
 } from '../src/components/BookingForm'
 import { Sheet } from '../src/components/Sheet'
 import { Button } from '../src/components/ui'
-import { computeDistanceMeters } from '@spark/maps'
+import { computeDistanceMeters, generalizedCostCents } from '@spark/maps'
 import { Map } from '../src/components/map'
 import type { MapBounds, MapRegion } from '../src/components/map'
-import { searchFacilities, type FacilitySearchResult } from '../src/lib/api'
+import { searchFacilities, type FacilityCluster, type FacilitySearchResult } from '../src/lib/api'
 import { openDirections } from '../src/lib/directions'
 import { FALLBACK_CENTER, VEHICLE_TYPES } from '../src/lib/constants'
 import { formatDateTimeShort } from '../src/lib/format'
@@ -42,7 +42,14 @@ function contains(outer: MapBounds, inner: MapBounds): boolean {
 function padBounds(b: MapBounds, factor: number): MapBounds {
   const dLat = (b.north - b.south) * factor
   const dLng = (b.east - b.west) * factor
-  return { north: b.north + dLat, south: b.south - dLat, east: b.east + dLng, west: b.west - dLng }
+  // Clamp to valid lat/lng so a padded continent-scale viewport doesn't exceed the
+  // API's ±90/±180 bounds and get rejected as a validation error.
+  return {
+    north: Math.min(90, b.north + dLat),
+    south: Math.max(-90, b.south - dLat),
+    east: Math.min(180, b.east + dLng),
+    west: Math.max(-180, b.west - dLng),
+  }
 }
 
 function within(b: MapBounds, p: { lat: number; lng: number }): boolean {
@@ -75,6 +82,7 @@ export default function HomeScreen() {
   const [centerNonce, setCenterNonce] = useState(0)
   const [viewport, setViewport] = useState<MapRegion | null>(null)
   const [results, setResults] = useState<FacilitySearchResult[]>([])
+  const [clusters, setClusters] = useState<FacilityCluster[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [fitBounds, setFitBounds] = useState<MapBounds | null>(null)
@@ -119,7 +127,8 @@ export default function HomeScreen() {
       },
       { signal: controller.signal },
     )
-      .then((data) => {
+      .then((resp) => {
+        const data = resp.points
         if (data.length === 0) return
         const nearest = [...data]
           .sort((a, b) => computeDistanceMeters(here, a) - computeDistanceMeters(here, b))
@@ -162,7 +171,10 @@ export default function HomeScreen() {
       },
       { signal: controller.signal },
     )
-      .then((data) => setResults(data))
+      .then((resp) => {
+        setResults(resp.points)
+        setClusters(resp.clusters)
+      })
       .catch((e) => {
         if (e instanceof Error && e.name === 'AbortError') return
         lastFetched.current = null
@@ -195,12 +207,10 @@ export default function HomeScreen() {
     const sorted = [...base]
     if (sortMode === 'cost') {
       sorted.sort((a, b) => {
-        if (a.priceCents == null || b.priceCents == null) {
-          if (a.priceCents == null && b.priceCents == null) return a.distanceMeters - b.distanceMeters
-          return a.priceCents == null ? 1 : -1
-        }
-        if (a.priceCents !== b.priceCents) return a.priceCents - b.priceCents
-        return a.distanceMeters - b.distanceMeters
+        const ca = generalizedCostCents(a.priceCents, a.distanceMeters)
+        const cb = generalizedCostCents(b.priceCents, b.distanceMeters)
+        if (ca === cb) return a.distanceMeters - b.distanceMeters
+        return ca - cb
       })
     } else {
       sorted.sort((a, b) =>
@@ -277,6 +287,8 @@ export default function HomeScreen() {
           fitBounds={fitBounds}
           fitNonce={fitNonce}
           results={mapResults}
+          clusters={clusters}
+          onClusterPress={() => {}}
           onMarkerPress={openFacility}
           onDirections={navigateTo}
           onRegionChange={onRegionChange}
@@ -304,6 +316,7 @@ export default function HomeScreen() {
 
       <BottomSheet
         results={listResults}
+        clustered={clusters.length > 0}
         loading={loading}
         error={error}
         onSelect={openFacility}

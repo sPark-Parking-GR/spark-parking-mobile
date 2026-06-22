@@ -15,9 +15,7 @@ import { MapPin, PIN_ANCHOR } from './logo'
 import type { MapProps } from './types'
 
 function metaLine(r: FacilitySearchResult): string {
-  return (
-    (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters)
-  )
+  return (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters)
 }
 
 // Dark basemap (Google, Android) tuned to the navy brand canvas.
@@ -51,6 +49,8 @@ export function NativeMap({
   fitBounds,
   fitNonce,
   results,
+  clusters,
+  onClusterPress,
   onMarkerPress,
   onDirections,
   onRegionChange,
@@ -154,7 +154,10 @@ export function NativeMap({
               Math.abs(cam.center.longitude - r.lng) < CENTER_EPS
             )
               return
-            ref.current?.animateCamera({ center: { latitude: r.lat, longitude: r.lng } }, { duration: 350 })
+            ref.current?.animateCamera(
+              { center: { latitude: r.lat, longitude: r.lng } },
+              { duration: 350 },
+            )
           }}
         >
           <MapPin available={r.available} />
@@ -179,12 +182,42 @@ export function NativeMap({
           </Callout>
         </Marker>
       ))}
+      {clusters.map((c) => (
+        <Marker
+          key={c.id}
+          coordinate={{ latitude: c.lat, longitude: c.lng }}
+          tracksViewChanges={false}
+          onPress={async () => {
+            const cam = await ref.current?.getCamera()
+            ref.current?.animateCamera(
+              { center: { latitude: c.lat, longitude: c.lng }, zoom: (cam?.zoom ?? 12) + 2 },
+              { duration: 350 },
+            )
+            onClusterPress?.(c)
+          }}
+        >
+          <View style={styles.cluster}>
+            <Text style={styles.clusterText}>{c.count}</Text>
+          </View>
+        </Marker>
+      ))}
     </MapView>
   )
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
+  cluster: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: colors.primary,
+    borderWidth: 2,
+    borderColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  clusterText: { color: colors.textMain, fontSize: font.small, fontWeight: '700' },
   callout: {
     minWidth: 180,
     gap: 2,
@@ -211,7 +244,10 @@ const styles = StyleSheet.create({
     marginTop: space.sm,
   },
   calloutBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2 },
-  calloutBtnDirections: { borderLeftWidth: 1, borderLeftColor: colors.border, paddingLeft: space.md },
+  calloutBtnDirections: {
+    borderLeftWidth: 1,
+    borderLeftColor: colors.border,
+    paddingLeft: space.md,
+  },
   calloutCta: { fontSize: font.small, fontWeight: '600', color: colors.primary },
 })
-

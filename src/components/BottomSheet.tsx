@@ -33,6 +33,7 @@ const TIMING = { duration: 200 }
 
 export function BottomSheet({
   results,
+  clustered,
   loading,
   error,
   onSelect,
@@ -43,6 +44,9 @@ export function BottomSheet({
   costLabel,
 }: {
   results: FacilitySearchResult[]
+  // The map is showing aggregated clusters (zoomed out), so the list is empty by
+  // design — surface a zoom-in hint instead of the generic empty state.
+  clustered?: boolean
   loading: boolean
   error?: string | null
   onSelect: (id: string) => void
@@ -136,7 +140,10 @@ export function BottomSheet({
         const atBottom = scrollY.value >= maxScroll.value - 1
         const canRetract = ty.value < peekY - 1
         const canExpand = ty.value > openY + 1
-        if ((atTop && e.translationY > 0 && canRetract) || (atBottom && e.translationY < 0 && canExpand)) {
+        if (
+          (atTop && e.translationY > 0 && canRetract) ||
+          (atBottom && e.translationY < 0 && canExpand)
+        ) {
           driving.value = true
           handoff.value = e.translationY
           start.value = ty.value
@@ -187,6 +194,8 @@ export function BottomSheet({
       <View style={styles.skeleton} />
       <View style={styles.skeleton} />
     </>
+  ) : clustered ? (
+    <Text style={styles.empty}>Κάνε ζουμ για να δεις χώρους στάθμευσης.</Text>
   ) : (
     <Text style={styles.empty}>Δεν βρέθηκαν χώροι. Δοκίμασε άλλη ώρα ή προορισμό.</Text>
   )
@@ -195,7 +204,9 @@ export function BottomSheet({
     ? error
     : loading
       ? 'Αναζήτηση…'
-      : `${results.length} χώροι στάθμευσης`
+      : clustered
+        ? 'Κάνε ζουμ για λεπτομέρειες'
+        : `${results.length} χώροι στάθμευσης`
 
   return (
     <Animated.View style={[styles.sheet, { height: fullH }, sheetStyle]}>
@@ -210,7 +221,10 @@ export function BottomSheet({
       </GestureDetector>
 
       {!error && (
-        <Animated.View style={[styles.sortClip, sortStyle]} pointerEvents={expanded ? 'auto' : 'none'}>
+        <Animated.View
+          style={[styles.sortClip, sortStyle]}
+          pointerEvents={expanded ? 'auto' : 'none'}
+        >
           <View
             style={styles.sortRow}
             onLayout={(e) => {

@@ -33,6 +33,10 @@ function buildHtml(center: { lat: number; lng: number }): string {
     .user-dot { width: 18px; height: 18px; border-radius: 50%; background: ${colors.primary};
       border: 3px solid ${colors.surface}; box-shadow: 0 0 0 2px ${colors.primaryTintBorder}, 0 1px 4px rgba(0,0,0,.3);
       transform: translate(-50%, -50%); }
+    .cluster { width: 44px; height: 44px; border-radius: 50%; background: ${colors.primary};
+      border: 2px solid ${colors.surface}; color: ${colors.textMain}; display: flex;
+      align-items: center; justify-content: center; font: 700 13px system-ui, sans-serif;
+      box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: pointer; }
   </style>
 </head>
 <body>
@@ -44,6 +48,7 @@ function buildHtml(center: { lat: number; lng: number }): string {
       attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20
     }).addTo(map);
     var layer = L.layerGroup().addTo(map);
+    var clusterLayer = L.layerGroup().addTo(map);
     function post(msg) {
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(msg));
     }
@@ -107,7 +112,20 @@ function buildHtml(center: { lat: number; lng: number }): string {
     // Persistent markers keyed by id. Refetch reconciles in place so the tapped
     // marker (and its open tooltip) is never destroyed and re-created.
     var markers = {};
+    var clusterMarkers = {};
+    function clearClusters() {
+      Object.keys(clusterMarkers).forEach(function (id) {
+        clusterLayer.removeLayer(clusterMarkers[id]); delete clusterMarkers[id];
+      });
+    }
+    function clearPoints() {
+      map.closePopup();
+      Object.keys(markers).forEach(function (id) {
+        layer.removeLayer(markers[id]); delete markers[id];
+      });
+    }
     window.render = function (items) {
+      if (items.length) clearClusters();
       var next = {};
       items.forEach(function (it) { next[it.id] = true; });
       Object.keys(markers).forEach(function (id) {
@@ -140,6 +158,36 @@ function buildHtml(center: { lat: number; lng: number }): string {
         markers[it.id] = m;
       });
     };
+    function makeClusterIcon(count) {
+      return L.divIcon({
+        className: '',
+        html: '<div class="cluster">' + count + '</div>',
+        iconSize: [44, 44], iconAnchor: [22, 22]
+      });
+    }
+    window.renderClusters = function (items) {
+      if (items.length) clearPoints();
+      var next = {};
+      items.forEach(function (it) { next[it.id] = true; });
+      Object.keys(clusterMarkers).forEach(function (id) {
+        if (!next[id]) { clusterLayer.removeLayer(clusterMarkers[id]); delete clusterMarkers[id]; }
+      });
+      items.forEach(function (it) {
+        var m = clusterMarkers[it.id];
+        if (m) {
+          m.setLatLng([it.lat, it.lng]);
+          if (m._count !== it.count) { m.setIcon(makeClusterIcon(it.count)); m._count = it.count; }
+          return;
+        }
+        m = L.marker([it.lat, it.lng], { icon: makeClusterIcon(it.count) }).addTo(clusterLayer);
+        m._count = it.count;
+        m.on('click', function () {
+          map.flyTo([it.lat, it.lng], Math.min(map.getZoom() + 2, 18), { animate: true });
+          post({ type: 'clusterpress', id: it.id });
+        });
+        clusterMarkers[it.id] = m;
+      });
+    };
     post({ type: 'ready' });
   </script>
 </body>
@@ -153,6 +201,8 @@ export function LeafletMap({
   fitBounds,
   fitNonce,
   results,
+  clusters,
+  onClusterPress,
   onMarkerPress,
   onDirections,
   onRegionChange,
@@ -176,10 +226,19 @@ export function LeafletMap({
     [results],
   )
 
+  const clusterPayload = useMemo(
+    () => clusters.map((c) => ({ id: c.id, lat: c.lat, lng: c.lng, count: c.count })),
+    [clusters],
+  )
+
   const readyRef = useRef(false)
 
   function renderMarkers() {
     ref.current?.injectJavaScript(`window.render(${JSON.stringify(payload)}); true;`)
+  }
+
+  function renderClusters() {
+    ref.current?.injectJavaScript(`window.renderClusters(${JSON.stringify(clusterPayload)}); true;`)
   }
 
   function recenter() {
@@ -203,6 +262,11 @@ export function LeafletMap({
     if (readyRef.current) renderMarkers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payload])
+
+  useEffect(() => {
+    if (readyRef.current) renderClusters()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [clusterPayload])
 
   useEffect(() => {
     if (readyRef.current) recenter()
@@ -237,6 +301,10 @@ export function LeafletMap({
         recenter()
         renderUser()
         renderMarkers()
+        renderClusters()
+      } else if (msg.type === 'clusterpress' && msg.id) {
+        const cluster = clusters.find((c) => c.id === msg.id)
+        if (cluster) onClusterPress?.(cluster)
       } else if (msg.type === 'navigate' && msg.id) {
         onMarkerPress(msg.id)
       } else if (msg.type === 'directions' && msg.id) {
