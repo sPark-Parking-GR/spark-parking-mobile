@@ -3,7 +3,7 @@ import { StyleSheet, Text, View } from 'react-native'
 import MapView, { Callout, Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps'
 import type { FacilitySearchResult } from '../../lib/api'
 import { formatDistance } from '../../lib/format'
-import { colors, font } from '../../theme'
+import { colors, font, radius, space } from '../../theme'
 import { MapPin, PIN_ANCHOR } from './logo'
 import type { MapProps } from './types'
 
@@ -145,7 +145,7 @@ export function NativeMap({
           }}
         >
           <MapPin available={r.available} />
-          <Callout onPress={() => onMarkerPress(r.id)}>
+          <Callout tooltip onPress={() => onMarkerPress(r.id)}>
             <View style={styles.callout}>
               <Text style={styles.calloutName}>{r.name}</Text>
               <Text style={styles.calloutAddr}>{r.address}</Text>
@@ -161,7 +161,21 @@ export function NativeMap({
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  callout: { minWidth: 180, paddingVertical: 2, gap: 2 },
+  callout: {
+    minWidth: 180,
+    gap: 2,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.md,
+    shadowColor: '#000',
+    shadowOpacity: 0.45,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
+  },
   calloutName: { fontSize: 14, fontWeight: '600', color: colors.textMain },
   calloutAddr: { fontSize: font.tiny, color: colors.textSecondary },
   calloutMeta: { fontSize: font.small, color: colors.textMain, marginTop: 2 },

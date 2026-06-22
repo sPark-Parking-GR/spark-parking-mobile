@@ -18,15 +18,18 @@ function buildHtml(center: { lat: number; lng: number }): string {
     .pin { filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); line-height: 0; }
     .leaflet-popup-content { margin: 10px 12px; }
     .leaflet-popup-content-wrapper { border-radius: 14px; cursor: pointer;
-      background: ${colors.surface}; color: ${colors.textMain}; border: 1px solid ${colors.border}; }
-    .leaflet-popup-tip { background: ${colors.surface}; }
+      background: ${colors.surface}; color: ${colors.textMain}; border: 1px solid ${colors.border};
+      box-shadow: 0 6px 20px rgba(0,0,0,.45); }
+    .leaflet-popup-tip { background: ${colors.surface}; border: 1px solid ${colors.border}; box-shadow: none; }
+    .leaflet-popup-close-button { color: ${colors.textSecondary} !important; }
+    .leaflet-popup-close-button:hover { color: ${colors.textMain} !important; }
     .tip { min-width: 170px; }
     .tip__name { font: 600 14px system-ui, sans-serif; color: ${colors.textMain}; }
     .tip__addr { font-size: 12px; color: ${colors.textSecondary}; margin: 2px 0 6px; }
     .tip__meta { font-size: 13px; color: ${colors.textMain}; margin-bottom: 6px; }
     .tip__cta { font: 600 13px system-ui, sans-serif; color: ${colors.primary}; }
-    .user-dot { width: 18px; height: 18px; border-radius: 50%; background: #1A73E8;
-      border: 3px solid #fff; box-shadow: 0 0 0 2px rgba(26,115,232,.35), 0 1px 4px rgba(0,0,0,.3);
+    .user-dot { width: 18px; height: 18px; border-radius: 50%; background: ${colors.primary};
+      border: 3px solid ${colors.surface}; box-shadow: 0 0 0 2px ${colors.primaryTintBorder}, 0 1px 4px rgba(0,0,0,.3);
       transform: translate(-50%, -50%); }
   </style>
 </head>
