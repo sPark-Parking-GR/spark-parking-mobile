@@ -46,6 +46,7 @@ export function NativeMap({
   results,
   onMarkerPress,
   onRegionChange,
+  onUserGesture,
   onMapPress,
   onSpotSelect,
 }: MapProps) {
@@ -109,9 +110,13 @@ export function NativeMap({
       style={styles.fill}
       initialRegion={region}
       showsUserLocation
+      showsMyLocationButton={false}
       customMapStyle={DARK_MAP_STYLE}
       userInterfaceStyle="dark"
       onRegionChangeComplete={handleRegion}
+      onRegionChangeStart={(_region, details) => {
+        if (details.isGesture) onUserGesture?.()
+      }}
       onPress={(e) => {
         if (e.nativeEvent.action === 'marker-press') return
         if (calloutOpen.current) {

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons'
+import { MaterialIcons } from '@expo/vector-icons'
 import { router } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -80,6 +80,7 @@ export default function HomeScreen() {
   const [fitNonce, setFitNonce] = useState(0)
   const [collapseNonce, setCollapseNonce] = useState(0)
   const [visibleBounds, setVisibleBounds] = useState<MapBounds | null>(null)
+  const [atUser, setAtUser] = useState(false)
   const autoLocated = useRef(false)
   // The padded bounds the current results cover; pans inside it skip refetching.
   const lastFetched = useRef<MapBounds | null>(null)
@@ -235,7 +236,10 @@ export default function HomeScreen() {
   }, 700)
 
   function locateMe() {
-    if (coords) recenterTo({ ...coords })
+    if (coords) {
+      recenterTo({ ...coords })
+      setAtUser(true)
+    }
     retry()
   }
 
@@ -266,6 +270,12 @@ export default function HomeScreen() {
           results={mapResults}
           onMarkerPress={openFacility}
           onRegionChange={onRegionChange}
+          onUserGesture={() => {
+            // A user gesture invalidates any search still queued for the
+            // just-recentered (user) position, so the stale request never fires.
+            onRegionChange.cancel()
+            setAtUser(false)
+          }}
           onMapPress={() => setCollapseNonce((n) => n + 1)}
           onSpotSelect={() => setCollapseNonce((n) => n + 1)}
         />
@@ -275,8 +285,8 @@ export default function HomeScreen() {
         onPress={locateMe}
         style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
       >
-        <Ionicons
-          name={status === 'denied' ? 'location-outline' : 'locate'}
+        <MaterialIcons
+          name={status === 'denied' ? 'gps-off' : atUser ? 'gps-fixed' : 'gps-not-fixed'}
           size={22}
           color={colors.primary}
         />

@@ -27,6 +27,9 @@ export interface MapProps {
   results: FacilitySearchResult[]
   onMarkerPress: (id: string) => void
   onRegionChange: (region: MapRegion) => void
+  // The user started moving the map (gesture only, not a programmatic camera
+  // move). Fires once at gesture start, so location-lock UI reacts without lag.
+  onUserGesture?: () => void
   // Tap on empty map (no spot, no open tooltip) — used to collapse the sheet.
   onMapPress: () => void
   // A spot marker was selected (tooltip opening) — used to collapse the sheet.
