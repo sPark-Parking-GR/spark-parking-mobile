@@ -49,11 +49,15 @@ function buildHtml(center: { lat: number; lng: number }): string {
     }).addTo(map);
     var layer = L.layerGroup().addTo(map);
     var clusterLayer = L.layerGroup().addTo(map);
+    // True while a scripted camera move (recenter/fit/flyTo) animates, so the gesture
+    // signal fires only for real user pan/zoom — mirrors the native provider isGesture.
+    var programmatic = false;
     function post(msg) {
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(msg));
     }
-    window.recenter = function (lat, lng) { map.setView([lat, lng], DEFAULT_ZOOM, { animate: true }); };
+    window.recenter = function (lat, lng) { programmatic = true; map.setView([lat, lng], DEFAULT_ZOOM, { animate: true }); };
     window.fitBounds = function (s, w, n, e) {
+      programmatic = true;
       map.fitBounds([[s, w], [n, e]], { padding: [60, 60], maxZoom: 16, animate: true });
     };
     var userMarker = null;
@@ -71,6 +75,12 @@ function buildHtml(center: { lat: number; lng: number }): string {
     var CENTER_EPS = 1e-5;
     // Close the tooltip on any user-driven map movement (drag/zoom/resize).
     map.on('movestart zoomstart resize', function () { if (!selecting) map.closePopup(); });
+    // A user pan or zoom — not a scripted move — clears the location lock so the
+    // locate button icon reverts to the no-dot state.
+    map.on('movestart zoomstart', function () {
+      if (!programmatic && !selecting) post({ type: 'gesture' });
+    });
+    map.on('moveend zoomend', function () { programmatic = false; });
     // A tap on empty map collapses the sheet — but if a tooltip is open, that tap
     // just closes the tooltip (popup still open at click time), so skip it.
     var popupOpen = false;
@@ -182,6 +192,7 @@ function buildHtml(center: { lat: number; lng: number }): string {
         m = L.marker([it.lat, it.lng], { icon: makeClusterIcon(it.count) }).addTo(clusterLayer);
         m._count = it.count;
         m.on('click', function () {
+          programmatic = true;
           map.flyTo([it.lat, it.lng], Math.min(map.getZoom() + 2, 18), { animate: true });
           post({ type: 'clusterpress', id: it.id });
         });
@@ -206,6 +217,7 @@ export function LeafletMap({
   onMarkerPress,
   onDirections,
   onRegionChange,
+  onUserGesture,
   onMapPress,
   onSpotSelect,
 }: MapProps) {
@@ -309,6 +321,8 @@ export function LeafletMap({
         onMarkerPress(msg.id)
       } else if (msg.type === 'directions' && msg.id) {
         onDirections(msg.id)
+      } else if (msg.type === 'gesture') {
+        onUserGesture?.()
       } else if (msg.type === 'mappress') {
         onMapPress()
       } else if (msg.type === 'spotpress') {
