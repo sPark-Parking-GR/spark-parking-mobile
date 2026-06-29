@@ -34,7 +34,7 @@ export function defaultStart(): Date {
 }
 
 export function defaultEnd(start: Date): Date {
-  return new Date(start.getTime() + 2 * 60 * 60_000)
+  return new Date(start.getTime() + MIN_DURATION_MS)
 }
 
 export function BookingForm({
@@ -85,6 +85,7 @@ export function BookingForm({
           icon="time-outline"
           value={end}
           minimumDate={new Date(start.getTime() + MIN_DURATION_MS)}
+          anchor={start}
           onChange={changeEnd}
         />
       </View>

@@ -1,16 +1,9 @@
 import { Ionicons } from '@expo/vector-icons'
-import { useEffect, useRef, useState } from 'react'
-import {
-  type NativeScrollEvent,
-  type NativeSyntheticEvent,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native'
+import { useMemo, useRef, useState } from 'react'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import { WheelPicker } from 'react-native-infinite-wheel-picker'
 import { formatDateTimeShort } from '../lib/format'
-import { colors, font, radius, space } from '../theme'
+import { colors, font, radius } from '../theme'
 import { Sheet } from './Sheet'
 
 const MONTHS = [
@@ -27,10 +20,13 @@ const MONTHS = [
   'Νοεμβρίου',
   'Δεκεμβρίου',
 ]
-const MINUTE_STEP = 5
-const STEPS_PER_HOUR = 60 / MINUTE_STEP
 const ITEM_H = 44
 const VISIBLE = 5
+const REST = 2
+const FUTURE_DAY_OFFSET_H = 12
+// Render the whole batch up front so a remount (e.g. the day list changing with
+// the month) never paints blank waiting on an async scroll-to-index.
+const LIST_PROPS = { initialNumToRender: 40, onScrollToIndexFailed: () => {} }
 
 function pad(n: number): string {
   return n < 10 ? `0${n}` : String(n)
@@ -44,106 +40,13 @@ function range(from: number, to: number): number[] {
   return Array.from({ length: to - from + 1 }, (_, i) => from + i)
 }
 
-// Round a date up to the next MINUTE_STEP boundary (drops seconds).
+// Round a date up to the next whole minute (drops seconds).
 function snapUp(date: Date): Date {
   const d = new Date(date)
+  const sub = d.getSeconds() !== 0 || d.getMilliseconds() !== 0
   d.setSeconds(0, 0)
-  const r = d.getMinutes() % MINUTE_STEP
-  if (r) d.setMinutes(d.getMinutes() + (MINUTE_STEP - r))
+  if (sub) d.setMinutes(d.getMinutes() + 1)
   return d
-}
-
-function Wheel({
-  items,
-  index,
-  onSelect,
-  flex,
-}: {
-  items: string[]
-  index: number
-  onSelect: (i: number) => void
-  flex: number
-}) {
-  const ref = useRef<ScrollView>(null)
-  const locked = items.length <= 1
-  const first = useRef(true)
-  const momentum = useRef(false)
-  const centeredRef = useRef(index)
-  const [centered, setCentered] = useState(index)
-
-  function setCenter(i: number) {
-    const clamped = Math.max(0, Math.min(items.length - 1, i))
-    if (clamped !== centeredRef.current) {
-      centeredRef.current = clamped
-      setCentered(clamped)
-    }
-  }
-
-  // Keep the scroll position in sync when the index changes from outside
-  // (e.g. the day clamps after a month change). Instant on first paint.
-  useEffect(() => {
-    // Skip when the position already matches — the change came from a tap or
-    // scroll that has already moved the wheel, and a second animation here
-    // would interrupt the in-flight one and strand it between cells.
-    if (!first.current && index === centeredRef.current) return
-    const animated = !first.current
-    first.current = false
-    setCenter(index)
-    const id = requestAnimationFrame(() =>
-      ref.current?.scrollTo({ y: index * ITEM_H, animated }),
-    )
-    return () => cancelAnimationFrame(id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [index])
-
-  function onScroll(e: NativeSyntheticEvent<NativeScrollEvent>) {
-    setCenter(Math.round(e.nativeEvent.contentOffset.y / ITEM_H))
-  }
-
-  function commit() {
-    if (centeredRef.current !== index) onSelect(centeredRef.current)
-    else ref.current?.scrollTo({ y: index * ITEM_H, animated: true })
-  }
-
-  function tap(i: number) {
-    setCenter(i)
-    ref.current?.scrollTo({ y: i * ITEM_H, animated: true })
-    if (i !== index) onSelect(i)
-  }
-
-  return (
-    <View style={[styles.wheel, { flex }]}>
-      <ScrollView
-        ref={ref}
-        scrollEnabled={!locked}
-        showsVerticalScrollIndicator={false}
-        snapToInterval={ITEM_H}
-        decelerationRate="normal"
-        scrollEventThrottle={16}
-        onScroll={onScroll}
-        onScrollBeginDrag={() => {
-          momentum.current = false
-        }}
-        onMomentumScrollBegin={() => {
-          momentum.current = true
-        }}
-        onMomentumScrollEnd={commit}
-        onScrollEndDrag={() => {
-          requestAnimationFrame(() => {
-            if (!momentum.current) commit()
-          })
-        }}
-        contentContainerStyle={{ paddingVertical: ITEM_H * Math.floor(VISIBLE / 2) }}
-      >
-        {items.map((label, i) => (
-          <Pressable key={label} style={styles.item} onPress={() => tap(i)}>
-            <Text style={[styles.itemText, i === centered && styles.itemTextActive]}>{label}</Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-      <View pointerEvents="none" style={styles.selection} />
-    </View>
-  )
 }
 
 export function DateTimeField({
@@ -151,68 +54,126 @@ export function DateTimeField({
   icon,
   value,
   minimumDate,
+  anchor,
   onChange,
 }: {
   label: string
   icon: keyof typeof Ionicons.glyphMap
   value: Date
   minimumDate?: Date
+  anchor?: Date
   onChange: (date: Date) => void
 }) {
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(value)
   const [tab, setTab] = useState<'date' | 'time'>('date')
+  // The floor is frozen when the sheet opens so the wheels keep stable data
+  // (the library copies `data` once at mount and never updates it).
+  const [minDate, setMinDate] = useState<Date>(() => snapUp(value))
 
-  const now = new Date()
-  const min = snapUp(minimumDate && minimumDate > now ? minimumDate : now)
-  // Input is bound to the current month/year.
+  // Handlers fire on a 100ms timer inside the library, so read live state here.
+  const draftRef = useRef(draft)
+  draftRef.current = draft
+
+  const min = minDate
   const curYear = min.getFullYear()
-  const curMonth = min.getMonth()
+  const minMonth = min.getMonth()
 
   function openPicker() {
-    setDraft(draftFor(value < min ? min : value))
+    const m = snapUp(minimumDate && minimumDate > new Date() ? minimumDate : new Date())
+    const s = snapUp(value < m ? m : value)
+    const mo = Math.min(Math.max(s.getMonth(), m.getMonth()), 11)
+    setMinDate(m)
+    setDraft(new Date(m.getFullYear(), mo, s.getDate(), s.getHours(), s.getMinutes()))
     setTab('date')
     setOpen(true)
   }
 
-  // Snap an incoming value onto the allowed grid (current month/year, minute step).
-  function draftFor(d: Date): Date {
-    const snapped = snapUp(d)
-    return new Date(curYear, curMonth, snapped.getDate(), snapped.getHours(), snapped.getMinutes())
-  }
+  // Month range: current month → December. Day range: the floor day of the
+  // selected month → its last day. Hour/minute are floored only on the very
+  // earliest selectable day/hour.
+  const month = Math.min(Math.max(draft.getMonth(), minMonth), 11)
+  const onMinMonth = month === minMonth
+  const minDay = onMinMonth ? min.getDate() : 1
+  const monthLast = daysInMonth(curYear, month)
+  const day = Math.min(Math.max(draft.getDate(), minDay), monthLast)
 
-  // Day range: today → end of the current month.
-  const minDay = min.getDate()
-  const dayValues = range(minDay, daysInMonth(curYear, curMonth))
-  const day = Math.min(Math.max(draft.getDate(), minDay), dayValues[dayValues.length - 1]!)
-
-  // Hours: bounded by the floor only on the earliest selectable day.
-  const onMinDay = day === minDay
+  const onMinDay = onMinMonth && day === min.getDate()
   const minHour = onMinDay ? min.getHours() : 0
-  const hourValues = range(minHour, 23)
   const hour = Math.min(Math.max(draft.getHours(), minHour), 23)
 
-  // Minutes: bounded by the floor only at the earliest selectable hour.
   const onMinHour = onMinDay && hour === min.getHours()
-  const minStep = onMinHour ? Math.ceil(min.getMinutes() / MINUTE_STEP) : 0
-  const minuteValues = range(minStep, STEPS_PER_HOUR - 1).map((s) => s * MINUTE_STEP)
-  const minuteIdx = Math.min(
-    Math.max(Math.round(draft.getMinutes() / MINUTE_STEP), minStep),
-    STEPS_PER_HOUR - 1,
-  )
-  const minute = minuteIdx * MINUTE_STEP
+  const minMinute = onMinHour ? min.getMinutes() : 0
+  const minute = Math.min(Math.max(draft.getMinutes(), minMinute), 59)
 
-  function build(parts: { d?: number; h?: number; mi?: number }): void {
-    const next = new Date(
-      curYear,
-      curMonth,
-      parts.d ?? day,
-      parts.h ?? hour,
-      parts.mi ?? minute,
-    )
-    const clamped = next < min ? new Date(min) : next
-    setDraft(clamped)
-    onChange(clamped)
+  const monthData = useMemo(() => range(minMonth, 11).map((m) => MONTHS[m]!), [minMonth])
+  const dayData = useMemo(() => range(minDay, monthLast).map(String), [minDay, monthLast])
+  const hourData = useMemo(() => range(minHour, 23).map(pad), [minHour])
+  const minuteData = useMemo(() => range(minMinute, 59).map(pad), [minMinute])
+
+  function commitDate(mo: number, d: number): void {
+    const cur = draftRef.current
+    let h = cur.getHours()
+    let mi = cur.getMinutes()
+    // Leaving the earliest day onto a later one seeds the time with anchor + 12h
+    // (depart selector) so it never strands at the floor. Further date tweaks keep
+    // whatever time the user has since set.
+    if (anchor) {
+      const targetEarliest = mo === minMonth && d === min.getDate()
+      const curEarliest = cur.getMonth() === minMonth && cur.getDate() === min.getDate()
+      if (!targetEarliest && curEarliest) {
+        h = (anchor.getHours() + FUTURE_DAY_OFFSET_H) % 24
+        mi = anchor.getMinutes()
+      }
+    }
+    let next = new Date(curYear, mo, d, h, mi)
+    if (next < min) next = new Date(min)
+    setDraft(next)
+    onChange(next)
+  }
+
+  function onMonth(index: number): void {
+    const newMonth = minMonth + index
+    const cur = draftRef.current
+    if (newMonth === cur.getMonth()) return
+    const floorDay = newMonth === minMonth ? min.getDate() : 1
+    const d = Math.min(Math.max(cur.getDate(), floorDay), daysInMonth(curYear, newMonth))
+    commitDate(newMonth, d)
+  }
+
+  function onDay(index: number): void {
+    const cur = draftRef.current
+    const floorDay = cur.getMonth() === minMonth ? min.getDate() : 1
+    const newDay = floorDay + index
+    if (newDay === cur.getDate()) return
+    commitDate(cur.getMonth(), newDay)
+  }
+
+  function onHour(index: number): void {
+    const cur = draftRef.current
+    const floorHour =
+      cur.getMonth() === minMonth && cur.getDate() === min.getDate() ? min.getHours() : 0
+    const newHour = floorHour + index
+    if (newHour === cur.getHours()) return
+    let next = new Date(curYear, cur.getMonth(), cur.getDate(), newHour, cur.getMinutes())
+    if (next < min) next = new Date(min)
+    setDraft(next)
+    onChange(next)
+  }
+
+  function onMinute(index: number): void {
+    const cur = draftRef.current
+    const onEarliestHour =
+      cur.getMonth() === minMonth &&
+      cur.getDate() === min.getDate() &&
+      cur.getHours() === min.getHours()
+    const floorMinute = onEarliestHour ? min.getMinutes() : 0
+    const newMinute = floorMinute + index
+    if (newMinute === cur.getMinutes()) return
+    let next = new Date(curYear, cur.getMonth(), cur.getDate(), cur.getHours(), newMinute)
+    if (next < min) next = new Date(min)
+    setDraft(next)
+    onChange(next)
   }
 
   return (
@@ -235,62 +196,106 @@ export function DateTimeField({
 
       <Sheet open={open} onClose={() => setOpen(false)}>
         <View style={styles.header}>
-              <Text style={styles.headerLabel}>{label}</Text>
-              <Text style={styles.headerValue}>{formatDateTimeShort(draft.toISOString())}</Text>
-            </View>
+          <Text style={styles.headerLabel}>{label}</Text>
+          <Text style={styles.headerValue}>{formatDateTimeShort(draft.toISOString())}</Text>
+        </View>
 
-            <View style={styles.toggle}>
-              {(['date', 'time'] as const).map((t) => {
-                const active = tab === t
-                return (
-                  <Pressable
-                    key={t}
-                    onPress={() => setTab(t)}
-                    style={[styles.toggleBtn, active && styles.toggleBtnActive]}
-                  >
-                    <Ionicons
-                      name={t === 'date' ? 'calendar-outline' : 'time-outline'}
-                      size={16}
-                      color={active ? '#fff' : colors.textSecondary}
-                    />
-                    <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
-                      {t === 'date' ? 'Ημερομηνία' : 'Ώρα'}
-                    </Text>
-                  </Pressable>
-                )
-              })}
-            </View>
+        <View style={styles.toggle}>
+          {(['date', 'time'] as const).map((t) => {
+            const active = tab === t
+            return (
+              <Pressable
+                key={t}
+                onPress={() => setTab(t)}
+                style={[styles.toggleBtn, active && styles.toggleBtnActive]}
+              >
+                <Ionicons
+                  name={t === 'date' ? 'calendar-outline' : 'time-outline'}
+                  size={16}
+                  color={active ? '#fff' : colors.textSecondary}
+                />
+                <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
+                  {t === 'date' ? 'Ημερομηνία' : 'Ώρα'}
+                </Text>
+              </Pressable>
+            )
+          })}
+        </View>
 
-            <View style={styles.wheels}>
-              {tab === 'date' ? (
-                <>
-                  <Wheel items={[MONTHS[curMonth]!]} index={0} onSelect={() => {}} flex={1.6} />
-                  <Wheel
-                    items={dayValues.map(String)}
-                    index={day - minDay}
-                    onSelect={(i) => build({ d: dayValues[i] })}
-                    flex={1}
-                  />
-                  <Wheel items={[String(curYear)]} index={0} onSelect={() => {}} flex={1.2} />
-                </>
-              ) : (
-                <>
-                  <Wheel
-                    items={hourValues.map(pad)}
-                    index={hour - minHour}
-                    onSelect={(i) => build({ h: hourValues[i] })}
-                    flex={1}
-                  />
-                  <Text style={styles.colon}>:</Text>
-                  <Wheel
-                    items={minuteValues.map(pad)}
-                    index={minuteIdx - minStep}
-                    onSelect={(i) => build({ mi: minuteValues[i] })}
-                    flex={1}
-                  />
-                </>
-              )}
-            </View>
+        <View style={styles.wheels}>
+          {tab === 'date' ? (
+            <>
+              <WheelPicker
+                key="month"
+                data={monthData}
+                selectedIndex={month - minMonth}
+                initialSelectedIndex={month - minMonth}
+                infiniteScroll={false}
+                onChangeValue={onMonth}
+                elementHeight={ITEM_H}
+                restElements={REST}
+                decelerationRate="normal"
+                flatListProps={LIST_PROPS}
+                containerStyle={[styles.wheel, styles.wheelWide]}
+                selectedLayoutStyle={styles.selection}
+                elementTextStyle={styles.itemText}
+                elementContainerStyle={styles.itemContainer}
+              />
+              <WheelPicker
+                key={`day-${minDay}-${monthLast}`}
+                data={dayData}
+                selectedIndex={day - minDay}
+                initialSelectedIndex={day - minDay}
+                infiniteScroll={false}
+                onChangeValue={onDay}
+                elementHeight={ITEM_H}
+                restElements={REST}
+                decelerationRate="normal"
+                flatListProps={LIST_PROPS}
+                containerStyle={styles.wheel}
+                selectedLayoutStyle={styles.selection}
+                elementTextStyle={styles.itemText}
+                elementContainerStyle={styles.itemContainer}
+              />
+            </>
+          ) : (
+            <>
+              <WheelPicker
+                key="hour"
+                data={hourData}
+                selectedIndex={hour - minHour}
+                initialSelectedIndex={hour - minHour}
+                infiniteScroll={false}
+                onChangeValue={onHour}
+                elementHeight={ITEM_H}
+                restElements={REST}
+                decelerationRate="normal"
+                flatListProps={LIST_PROPS}
+                containerStyle={styles.wheel}
+                selectedLayoutStyle={styles.selection}
+                elementTextStyle={styles.itemText}
+                elementContainerStyle={styles.itemContainer}
+              />
+              <Text style={styles.colon}>:</Text>
+              <WheelPicker
+                key={`min-${minMinute}`}
+                data={minuteData}
+                selectedIndex={minute - minMinute}
+                initialSelectedIndex={minute - minMinute}
+                infiniteScroll={false}
+                onChangeValue={onMinute}
+                elementHeight={ITEM_H}
+                restElements={REST}
+                decelerationRate="normal"
+                flatListProps={LIST_PROPS}
+                containerStyle={styles.wheel}
+                selectedLayoutStyle={styles.selection}
+                elementTextStyle={styles.itemText}
+                elementContainerStyle={styles.itemContainer}
+              />
+            </>
+          )}
+        </View>
       </Sheet>
     </>
   )
@@ -319,7 +324,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: { flex: 1 },
-  label: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase' },
+  label: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+  },
   value: { fontSize: font.small, color: colors.textMain, fontWeight: '600' },
 
   header: { alignItems: 'center', gap: 2 },
@@ -364,20 +374,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: ITEM_H * VISIBLE,
   },
-  wheel: { height: ITEM_H * VISIBLE },
-  item: { height: ITEM_H, alignItems: 'center', justifyContent: 'center' },
-  itemText: { fontSize: font.body, color: colors.textSecondary },
-  itemTextActive: { fontSize: font.heading, fontWeight: '700', color: colors.textMain },
+  wheel: { flex: 1 },
+  wheelWide: { flex: 1.8 },
+  itemContainer: { paddingHorizontal: 4 },
+  itemText: { fontSize: font.body, fontWeight: '600', color: colors.textMain },
   selection: {
-    position: 'absolute',
-    left: 6,
-    right: 6,
-    top: ITEM_H * Math.floor(VISIBLE / 2),
-    height: ITEM_H,
-    borderRadius: radius.sm,
     backgroundColor: colors.primaryTint,
     borderWidth: 1,
     borderColor: colors.primaryTintBorder,
+    borderRadius: radius.sm,
   },
-  colon: { fontSize: font.heading, fontWeight: '700', color: colors.textMain, paddingHorizontal: 4 },
+  colon: {
+    fontSize: font.heading,
+    fontWeight: '700',
+    color: colors.textMain,
+    paddingHorizontal: 4,
+  },
 })
