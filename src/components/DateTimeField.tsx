@@ -82,6 +82,10 @@ function Wheel({
   // Keep the scroll position in sync when the index changes from outside
   // (e.g. the day clamps after a month change). Instant on first paint.
   useEffect(() => {
+    // Skip when the position already matches — the change came from a tap or
+    // scroll that has already moved the wheel, and a second animation here
+    // would interrupt the in-flight one and strand it between cells.
+    if (!first.current && index === centeredRef.current) return
     const animated = !first.current
     first.current = false
     setCenter(index)
