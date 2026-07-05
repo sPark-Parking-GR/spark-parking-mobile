@@ -9,6 +9,7 @@ import {
   View,
   type TextInputProps,
 } from 'react-native'
+
 import { colors, font, radius, space } from '../theme'
 
 export function Card({ children, style }: { children: ReactNode; style?: object }) {
@@ -71,18 +72,11 @@ export function Badge({ label, variant = 'neutral' }: { label: string; variant?:
   )
 }
 
-export function Field({
-  label,
-  ...props
-}: { label: string } & TextInputProps) {
+export function Field({ label, ...props }: { label: string } & TextInputProps) {
   return (
     <View style={styles.field}>
       <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput
-        placeholderTextColor={colors.textSecondary}
-        style={styles.input}
-        {...props}
-      />
+      <TextInput placeholderTextColor={colors.textSecondary} style={styles.input} {...props} />
     </View>
   )
 }

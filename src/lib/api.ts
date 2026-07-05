@@ -62,8 +62,8 @@ export interface FacilityDetail {
   heightRestrictionCm: number | null
   amenities: string[]
   cancellationPolicy: string
-  images: Array<{ id: string; url: string; altText: string | null }>
-  tariffPlans: Array<{
+  images: { id: string; url: string; altText: string | null }[]
+  tariffPlans: {
     id: string
     name: string
     isDefault: boolean
@@ -72,28 +72,28 @@ export interface FacilityDetail {
     incrementMinutes: number
     version: number
     vehicleTypes: string[]
-    tiers: Array<{
+    tiers: {
       id: string
       fromMinute: number
       toMinute: number | null
       unit: string
       blockMinutes: number | null
-      rates: Array<{ id: string; windowId: string; priceCents: number; currency: string }>
-    }>
-    windows: Array<{
+      rates: { id: string; windowId: string; priceCents: number; currency: string }[]
+    }[]
+    windows: {
       id: string
       label: string
       dayMask: number
       startMinute: number
       endMinute: number
-    }>
-    caps: Array<{
+    }[]
+    caps: {
       id: string
       windowMinutes: number
       capCents: number
       scope: string
-    }>
-  }>
+    }[]
+  }[]
   rating: { average: number | null; count: number }
 }
 

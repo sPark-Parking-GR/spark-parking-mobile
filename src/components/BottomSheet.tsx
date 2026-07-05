@@ -12,6 +12,7 @@ import Animated, {
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated'
+
 import type { FacilitySearchResult } from '../lib/api'
 import { colors, font, radius, space } from '../theme'
 import { FacilityCard } from './FacilityCard'

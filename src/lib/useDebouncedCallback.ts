@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 
 export interface DebouncedCallback<A extends unknown[]> {
   (...args: A): void

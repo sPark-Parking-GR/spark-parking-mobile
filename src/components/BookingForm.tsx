@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { StyleSheet, View } from 'react-native'
+
 import { VEHICLE_TYPES } from '../lib/constants'
 import { space } from '../theme'
 import { DateTimeField } from './DateTimeField'

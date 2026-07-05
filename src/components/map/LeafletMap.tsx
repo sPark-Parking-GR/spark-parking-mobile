@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
-import { formatDistance } from '../../lib/format'
-import { colors } from '../../theme'
+
 import { PIN_ANCHOR, PIN_SIZE, pinSvgMarkup } from './logo'
 import type { MapProps } from './types'
+import { formatDistance } from '../../lib/format'
+import { colors } from '../../theme'
 
 function buildHtml(center: { lat: number; lng: number }): string {
   return `<!DOCTYPE html>

@@ -9,6 +9,7 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated'
+
 import { colors, radius, space } from '../theme'
 
 const SPRING = { damping: 22, stiffness: 220, mass: 0.9 }

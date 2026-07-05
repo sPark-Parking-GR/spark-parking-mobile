@@ -1,5 +1,6 @@
 import { memo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
+
 import type { FacilitySearchResult } from '../lib/api'
 import { formatDistance, formatMoney } from '../lib/format'
 import { colors, font, radius, space } from '../theme'

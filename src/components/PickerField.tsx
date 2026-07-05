@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
 import { useState } from 'react'
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
+
 import { colors, font, radius, space } from '../theme'
 
 export interface PickerOption {
@@ -59,7 +60,9 @@ export function PickerField({
                       setOpen(false)
                     }}
                   >
-                    <Text style={[styles.rowText, active && styles.rowTextActive]}>{item.label}</Text>
+                    <Text style={[styles.rowText, active && styles.rowTextActive]}>
+                      {item.label}
+                    </Text>
                     {active ? <Ionicons name="checkmark" size={18} color={colors.primary} /> : null}
                   </Pressable>
                 )
@@ -94,7 +97,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   text: { flex: 1 },
-  label: { fontSize: 11, fontWeight: '600', color: colors.textSecondary, textTransform: 'uppercase' },
+  label: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textSecondary,
+    textTransform: 'uppercase',
+  },
   value: { fontSize: font.body, color: colors.textMain, fontWeight: '600' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
   sheet: {

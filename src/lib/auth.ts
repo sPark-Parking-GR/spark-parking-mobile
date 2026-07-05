@@ -1,7 +1,8 @@
 import { createAuthContext } from '@spark/auth'
 import type { AuthProviderConfig } from '@spark/auth'
 
-const PROVIDER = (process.env['EXPO_PUBLIC_AUTH_PROVIDER'] ?? 'firebase') as AuthProviderConfig['provider']
+const PROVIDER = (process.env['EXPO_PUBLIC_AUTH_PROVIDER'] ??
+  'firebase') as AuthProviderConfig['provider']
 
 function getAuthConfig(): AuthProviderConfig {
   switch (PROVIDER) {

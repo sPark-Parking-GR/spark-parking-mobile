@@ -8,11 +8,12 @@ import MapView, {
   PROVIDER_GOOGLE,
   type Region,
 } from 'react-native-maps'
+
+import { MapPin, PIN_ANCHOR } from './logo'
+import type { MapProps } from './types'
 import type { FacilitySearchResult } from '../../lib/api'
 import { formatDistance } from '../../lib/format'
 import { colors, font, radius, space } from '../../theme'
-import { MapPin, PIN_ANCHOR } from './logo'
-import type { MapProps } from './types'
 
 function metaLine(r: FacilitySearchResult): string {
   return (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters)

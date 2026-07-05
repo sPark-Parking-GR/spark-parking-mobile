@@ -105,7 +105,13 @@ export function MapPin({ available }: { available: boolean }) {
           ))}
         </LinearGradient>
       </Defs>
-      <Path d={PIN_SILHOUETTE} fill={back} stroke={back} strokeWidth={PIN_RIM} strokeLinejoin="round" />
+      <Path
+        d={PIN_SILHOUETTE}
+        fill={back}
+        stroke={back}
+        strokeWidth={PIN_RIM}
+        strokeLinejoin="round"
+      />
       <G transform={LOGO_TRANSFORM}>
         {LOGO_PATHS.map((d) => (
           <Path key={d} d={d} fill={fg} />

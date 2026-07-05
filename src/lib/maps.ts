@@ -1,7 +1,8 @@
 import { createMapContext } from '@spark/maps'
 import type { MapProviderConfig } from '@spark/maps'
 
-const PROVIDER = (process.env['EXPO_PUBLIC_MAP_PROVIDER'] ?? 'google') as MapProviderConfig['provider']
+const PROVIDER = (process.env['EXPO_PUBLIC_MAP_PROVIDER'] ??
+  'google') as MapProviderConfig['provider']
 
 function getMapsConfig(): MapProviderConfig {
   switch (PROVIDER) {
