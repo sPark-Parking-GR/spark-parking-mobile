@@ -1,3 +1,5 @@
+import type { ThemeContextValue } from '@spark/ui'
+import { useTheme } from '@spark/ui'
 import { useEffect, useMemo, useRef } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
@@ -5,9 +7,11 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview'
 import { PIN_ANCHOR, PIN_SIZE, pinSvgMarkup } from './logo'
 import type { MapProps } from './types'
 import { formatDistance } from '../../lib/format'
-import { colors } from '../../theme'
 
-function buildHtml(center: { lat: number; lng: number }): string {
+function buildHtml(
+  center: { lat: number; lng: number },
+  colors: ThemeContextValue['colors'],
+): string {
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -15,27 +19,27 @@ function buildHtml(center: { lat: number; lng: number }): string {
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
-    html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: ${colors.bg}; }
+    html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: ${colors.map}; }
     .pin { filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); line-height: 0; }
     .leaflet-popup-content { margin: 10px 12px; }
     .leaflet-popup-content-wrapper { border-radius: 14px; cursor: pointer;
-      background: ${colors.surface}; color: ${colors.textMain}; border: 1px solid ${colors.border};
+      background: ${colors.surface}; color: ${colors.ink}; border: 1px solid ${colors.line};
       box-shadow: 0 6px 20px rgba(0,0,0,.45); }
-    .leaflet-popup-tip { background: ${colors.surface}; border: 1px solid ${colors.border}; box-shadow: none; }
-    .leaflet-popup-close-button { color: ${colors.textSecondary} !important; }
-    .leaflet-popup-close-button:hover { color: ${colors.textMain} !important; }
+    .leaflet-popup-tip { background: ${colors.surface}; border: 1px solid ${colors.line}; box-shadow: none; }
+    .leaflet-popup-close-button { color: ${colors.muted} !important; }
+    .leaflet-popup-close-button:hover { color: ${colors.ink} !important; }
     .tip { min-width: 170px; }
-    .tip__name { font: 600 14px system-ui, sans-serif; color: ${colors.textMain}; }
-    .tip__addr { font-size: 12px; color: ${colors.textSecondary}; margin: 2px 0 6px; }
-    .tip__meta { font-size: 13px; color: ${colors.textMain}; margin-bottom: 6px; }
+    .tip__name { font: 600 14px system-ui, sans-serif; color: ${colors.ink}; }
+    .tip__addr { font-size: 12px; color: ${colors.muted}; margin: 2px 0 6px; }
+    .tip__meta { font-size: 13px; color: ${colors.ink}; margin-bottom: 6px; }
     .tip__actions { display: flex; align-items: center; gap: 12px; }
-    .tip__cta { font: 600 13px system-ui, sans-serif; color: ${colors.primary}; cursor: pointer; }
-    .tip__dir { border-left: 1px solid ${colors.border}; padding-left: 12px; }
-    .user-dot { width: 18px; height: 18px; border-radius: 50%; background: ${colors.primary};
-      border: 3px solid ${colors.surface}; box-shadow: 0 0 0 2px ${colors.primaryTintBorder}, 0 1px 4px rgba(0,0,0,.3);
+    .tip__cta { font: 600 13px system-ui, sans-serif; color: ${colors.pri}; cursor: pointer; }
+    .tip__dir { border-left: 1px solid ${colors.line}; padding-left: 12px; }
+    .user-dot { width: 18px; height: 18px; border-radius: 50%; background: ${colors.pri};
+      border: 3px solid ${colors.surface}; box-shadow: 0 0 0 2px ${colors.priSoft}, 0 1px 4px rgba(0,0,0,.3);
       transform: translate(-50%, -50%); }
-    .cluster { width: 44px; height: 44px; border-radius: 50%; background: ${colors.primary};
-      border: 2px solid ${colors.surface}; color: ${colors.textMain}; display: flex;
+    .cluster { width: 44px; height: 44px; border-radius: 50%; background: ${colors.pri};
+      border: 2px solid ${colors.surface}; color: ${colors.ink}; display: flex;
       align-items: center; justify-content: center; font: 700 13px system-ui, sans-serif;
       box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: pointer; }
   </style>
@@ -98,8 +102,8 @@ function buildHtml(center: { lat: number; lng: number }): string {
     }
     map.on('moveend', postRegion);
     map.whenReady(postRegion);
-    var PIN_AVAIL = ${JSON.stringify(pinSvgMarkup(true))};
-    var PIN_FULL = ${JSON.stringify(pinSvgMarkup(false))};
+    var PIN_AVAIL = ${JSON.stringify(pinSvgMarkup(true, colors))};
+    var PIN_FULL = ${JSON.stringify(pinSvgMarkup(false, colors))};
     var PIN_SIZE = [${PIN_SIZE.width}, ${PIN_SIZE.height}];
     var PIN_ANCHOR = [${PIN_SIZE.width * PIN_ANCHOR.x}, ${PIN_SIZE.height * PIN_ANCHOR.y}];
     function makeIcon(available) {
@@ -222,8 +226,12 @@ export function LeafletMap({
   onMapPress,
   onSpotSelect,
 }: MapProps) {
+  const { mode, colors } = useTheme()
   const ref = useRef<WebView>(null)
-  const html = useMemo(() => buildHtml(center), [])
+  // Only `mode` (not `center`) is a dep: center changes are pushed via `recenter()`
+  // post-mount, not by rebuilding the whole HTML document.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const html = useMemo(() => buildHtml(center, colors), [mode])
 
   const payload = useMemo(
     () =>

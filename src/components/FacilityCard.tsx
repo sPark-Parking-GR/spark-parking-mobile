@@ -1,10 +1,11 @@
+import { spacing, typography, useTheme } from '@spark/ui'
 import { memo } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
+import { Badge } from './ui'
+import { useLanguage } from '../i18n/LanguageProvider'
 import type { FacilitySearchResult } from '../lib/api'
 import { formatDistance, formatMoney } from '../lib/format'
-import { colors, font, radius, space } from '../theme'
-import { Badge } from './ui'
 
 function FacilityCardBase({
   result,
@@ -13,37 +14,51 @@ function FacilityCardBase({
   result: FacilitySearchResult
   onSelect: (id: string) => void
 }) {
+  const { colors, radii } = useTheme()
+  const { locale, t } = useLanguage()
   const availability = !result.available
-    ? { label: 'Πλήρες', variant: 'error' as const }
+    ? { label: t('badgeFull'), variant: 'error' as const }
     : result.remainingSlots <= 5
-      ? { label: 'Περιορισμένο', variant: 'warning' as const }
-      : { label: 'Διαθέσιμο', variant: 'success' as const }
+      ? { label: t('badgeLimited'), variant: 'warning' as const }
+      : { label: t('badgeAvailable'), variant: 'success' as const }
 
   return (
     <Pressable
       onPress={() => onSelect(result.id)}
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.card,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.line,
+          borderRadius: radii.md,
+        },
+        pressed && styles.pressed,
+      ]}
     >
       <View style={styles.left}>
         <View style={styles.titleRow}>
-          <Text style={styles.title} numberOfLines={1}>
+          <Text style={[styles.title, { color: colors.ink }]} numberOfLines={1}>
             {result.name}
           </Text>
-          {result.isPromoted ? <Badge label="Προτεινόμενο" variant="neutral" /> : null}
+          {result.isPromoted ? <Badge label={t('badgePromoted')} variant="neutral" /> : null}
         </View>
-        <Text style={styles.address} numberOfLines={1}>
+        <Text style={[styles.address, { color: colors.muted }]} numberOfLines={1}>
           {result.address}
         </Text>
         <View style={styles.metaRow}>
           <Badge label={availability.label} variant={availability.variant} />
-          <Text style={styles.distance}>{formatDistance(result.distanceMeters)}</Text>
+          <Text style={[styles.distance, { color: colors.muted }]}>
+            {formatDistance(result.distanceMeters)}
+          </Text>
         </View>
       </View>
       <View style={styles.right}>
-        <Text style={styles.price}>
-          {result.priceCents != null ? formatMoney(result.priceCents, result.currency) : '—'}
+        <Text style={[styles.price, { color: colors.pri }]}>
+          {result.priceCents != null
+            ? formatMoney(result.priceCents, locale, result.currency)
+            : '—'}
         </Text>
-        <Text style={styles.priceLabel}>συνολικά</Text>
+        <Text style={[styles.priceLabel, { color: colors.muted }]}>{t('priceTotalSuffix')}</Text>
       </View>
     </Pressable>
   )
@@ -70,22 +85,19 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: space.md,
-    backgroundColor: colors.surface,
+    gap: spacing.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: space.md,
-    marginBottom: space.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
   },
   pressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
   left: { flex: 1, gap: 6 },
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: space.sm },
-  title: { fontSize: 17, fontWeight: '600', color: colors.textMain, flexShrink: 1 },
-  address: { fontSize: font.small, color: colors.textSecondary },
+  titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  title: { fontSize: typography.label.fontSize, fontWeight: '600', flexShrink: 1 },
+  address: { fontSize: typography.body.fontSize },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
-  distance: { fontSize: font.tiny, color: colors.textSecondary },
+  distance: { fontSize: typography.caption.fontSize },
   right: { alignItems: 'flex-end', justifyContent: 'center' },
-  price: { fontSize: 18, fontWeight: '700', color: colors.primary },
-  priceLabel: { fontSize: font.tiny, color: colors.textSecondary },
+  price: { fontSize: typography.heading.fontSize, fontWeight: '700' },
+  priceLabel: { fontSize: typography.caption.fontSize },
 })

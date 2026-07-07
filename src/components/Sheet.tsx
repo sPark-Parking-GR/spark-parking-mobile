@@ -1,3 +1,4 @@
+import { spacing, useTheme } from '@spark/ui'
 import { type ReactNode, useEffect, useState } from 'react'
 import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'
@@ -9,8 +10,6 @@ import Animated, {
   withSpring,
   withTiming,
 } from 'react-native-reanimated'
-
-import { colors, radius, space } from '../theme'
 
 const SPRING = { damping: 22, stiffness: 220, mass: 0.9 }
 const FADE = 220
@@ -26,6 +25,7 @@ export function Sheet({
   onClose: () => void
   children: ReactNode
 }) {
+  const { colors, radii } = useTheme()
   const { height } = useWindowDimensions()
   const [mounted, setMounted] = useState(open)
   const ty = useSharedValue(height)
@@ -71,17 +71,25 @@ export function Sheet({
   return (
     <Modal visible transparent statusBarTranslucent animationType="none" onRequestClose={onClose}>
       <GestureHandlerRootView style={styles.root}>
-        <Animated.View style={[styles.backdrop, backdropStyle]}>
+        <Animated.View style={[styles.backdrop, { backgroundColor: colors.scrim }, backdropStyle]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
           <Animated.View
-            style={[styles.sheet, sheetStyle]}
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.surface,
+                borderTopLeftRadius: radii.lg,
+                borderTopRightRadius: radii.lg,
+              },
+              sheetStyle,
+            ]}
             onLayout={(e) => {
               sheetH.value = e.nativeEvent.layout.height
             }}
           >
             <GestureDetector gesture={pan}>
               <View style={styles.handle}>
-                <View style={styles.grip} />
+                <View style={[styles.grip, { backgroundColor: colors.line }]} />
               </View>
             </GestureDetector>
             {children}
@@ -94,25 +102,21 @@ export function Sheet({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+  backdrop: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    paddingHorizontal: space.md,
-    paddingBottom: space.lg,
-    gap: space.md,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.lg,
+    gap: spacing.md,
     shadowColor: '#000',
     shadowOpacity: 0.16,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: -4 },
     elevation: 12,
   },
-  handle: { paddingTop: space.sm, paddingBottom: space.xs, alignItems: 'center' },
+  handle: { paddingTop: spacing.sm, paddingBottom: spacing.xs, alignItems: 'center' },
   grip: {
     width: 40,
     height: 4,
     borderRadius: 999,
-    backgroundColor: colors.border,
   },
 })

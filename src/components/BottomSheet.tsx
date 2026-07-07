@@ -1,3 +1,4 @@
+import { radii, spacing, typography, useTheme } from '@spark/ui'
 import { useCallback, useEffect, useState } from 'react'
 import { StyleSheet, Text, useWindowDimensions, View, type ListRenderItem } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'
@@ -13,17 +14,12 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated'
 
-import type { FacilitySearchResult } from '../lib/api'
-import { colors, font, radius, space } from '../theme'
 import { FacilityCard } from './FacilityCard'
 import { SegmentedControl, type Segment } from './SegmentedControl'
+import { useLanguage } from '../i18n/LanguageProvider'
+import type { FacilitySearchResult } from '../lib/api'
 
 export type SortMode = 'nearby' | 'cost'
-
-const SORT_SEGMENTS: Segment[] = [
-  { value: 'nearby', label: 'Κοντινά', icon: 'map-marker-distance' },
-  { value: 'cost', label: 'Φθηνότερα', icon: 'cash' },
-]
 
 const PEEK = 132
 const TAP_THRESHOLD = 8
@@ -60,6 +56,12 @@ export function BottomSheet({
   // Active cost window summary, shown under the chips while sorting by cost.
   costLabel?: string | null
 }) {
+  const { colors } = useTheme()
+  const { t } = useLanguage()
+  const sortSegments: Segment[] = [
+    { value: 'nearby', label: t('sortNearby'), icon: 'map-marker-distance' },
+    { value: 'cost', label: t('sortCheapest'), icon: 'cash' },
+  ]
   const { height: screenH } = useWindowDimensions()
   const fullH = Math.round(screenH * 0.85)
   const halfH = Math.round(screenH * 0.5)
@@ -189,34 +191,51 @@ export function BottomSheet({
     ({ item }) => <FacilityCard result={item} onSelect={onSelect} />,
     [onSelect],
   )
+  const skeletonStyle = [styles.skeleton, { borderRadius: radii.md, backgroundColor: colors.card2 }]
+  const emptyStyle = [styles.empty, { color: colors.muted }]
   const listEmpty = loading ? (
     <>
-      <View style={styles.skeleton} />
-      <View style={styles.skeleton} />
-      <View style={styles.skeleton} />
+      <View style={skeletonStyle} />
+      <View style={skeletonStyle} />
+      <View style={skeletonStyle} />
     </>
   ) : clustered ? (
-    <Text style={styles.empty}>Κάνε ζουμ για να δεις χώρους στάθμευσης.</Text>
+    <Text style={emptyStyle}>{t('zoomToSeeSpots')}</Text>
   ) : (
-    <Text style={styles.empty}>Δεν βρέθηκαν χώροι. Δοκίμασε άλλη ώρα ή προορισμό.</Text>
+    <Text style={emptyStyle}>{t('noResultsFound')}</Text>
   )
 
   const headerLabel = error
     ? error
     : loading
-      ? 'Αναζήτηση…'
+      ? t('searchingLabel')
       : clustered
-        ? 'Κάνε ζουμ για λεπτομέρειες'
-        : `${results.length} χώροι στάθμευσης`
+        ? t('zoomForDetails')
+        : `${results.length} ${t('parkingSpotsCountSuffix')}`
 
   return (
-    <Animated.View style={[styles.sheet, { height: fullH }, sheetStyle]}>
+    <Animated.View
+      style={[styles.sheet, { height: fullH, backgroundColor: colors.surface }, sheetStyle]}
+    >
       <GestureDetector gesture={pan}>
         <View style={styles.header}>
-          <View style={styles.grip} />
+          <View style={[styles.grip, { backgroundColor: colors.line }]} />
           <View style={styles.titleRow}>
-            <Text style={styles.title}>{headerLabel}</Text>
-            {!expanded && <Text style={styles.hint}>Σύρε για λίστα</Text>}
+            <Text
+              style={[styles.title, { fontSize: typography.label.fontSize, color: colors.ink }]}
+            >
+              {headerLabel}
+            </Text>
+            {!expanded && (
+              <Text
+                style={[
+                  styles.hint,
+                  { fontSize: typography.caption.fontSize, color: colors.muted },
+                ]}
+              >
+                {t('swipeForList')}
+              </Text>
+            )}
           </View>
         </View>
       </GestureDetector>
@@ -233,12 +252,18 @@ export function BottomSheet({
             }}
           >
             <SegmentedControl
-              segments={SORT_SEGMENTS}
+              segments={sortSegments}
               value={sortMode}
               onChange={(v) => (v === 'cost' ? onSortCost() : onSortNearby())}
             />
             {sortMode === 'cost' && costLabel ? (
-              <Text style={styles.sortCaption} numberOfLines={1}>
+              <Text
+                style={[
+                  styles.sortCaption,
+                  { fontSize: typography.caption.fontSize, color: colors.muted },
+                ]}
+                numberOfLines={1}
+              >
                 {costLabel}
               </Text>
             ) : null}
@@ -276,21 +301,19 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
+    borderTopLeftRadius: radii.lg,
+    borderTopRightRadius: radii.lg,
     shadowColor: '#000',
     shadowOpacity: 0.16,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: -4 },
     elevation: 12,
   },
-  header: { paddingTop: space.sm, paddingBottom: space.sm },
+  header: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
   grip: {
     width: 40,
     height: 4,
     borderRadius: 999,
-    backgroundColor: colors.border,
     alignSelf: 'center',
     marginBottom: 10,
   },
@@ -298,20 +321,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: space.md,
+    paddingHorizontal: spacing.md,
   },
-  title: { fontSize: font.body, fontWeight: '600', color: colors.textMain, flexShrink: 1 },
-  hint: { fontSize: font.tiny, color: colors.textSecondary },
+  title: { fontWeight: '700', flexShrink: 1 },
+  hint: { fontWeight: '600' },
   sortClip: { overflow: 'hidden' },
-  sortRow: { paddingHorizontal: space.md, paddingBottom: space.sm, gap: 6 },
-  sortCaption: { fontSize: font.tiny, color: colors.textSecondary, paddingHorizontal: 2 },
+  sortRow: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: 6 },
+  sortCaption: { fontWeight: '600', paddingHorizontal: 2 },
   body: { flex: 1 },
-  bodyContent: { padding: space.md, paddingTop: space.xs },
+  bodyContent: { padding: spacing.md, paddingTop: spacing.xs },
   skeleton: {
     height: 84,
-    borderRadius: radius.md,
-    marginBottom: space.md,
-    backgroundColor: colors.neutralBg,
+    marginBottom: spacing.md,
   },
-  empty: { fontSize: font.body, color: colors.textSecondary },
+  empty: { fontSize: typography.body.fontSize, fontWeight: typography.body.fontWeight },
 })

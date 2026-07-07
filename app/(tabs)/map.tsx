@@ -1,26 +1,26 @@
 import { MaterialIcons } from '@expo/vector-icons'
-import { router } from 'expo-router'
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, View } from 'react-native'
-import { BottomSheet, type SortMode } from '../src/components/BottomSheet'
-import {
-  BookingForm,
-  defaultEnd,
-  defaultStart,
-  type BookingValue,
-} from '../src/components/BookingForm'
-import { Sheet } from '../src/components/Sheet'
-import { Button } from '../src/components/ui'
 import { computeDistanceMeters, generalizedCostCents } from '@spark/maps'
-import { Map } from '../src/components/map'
-import type { MapBounds, MapRegion } from '../src/components/map'
-import { searchFacilities, type FacilityCluster, type FacilitySearchResult } from '../src/lib/api'
-import { openDirections } from '../src/lib/directions'
-import { FALLBACK_CENTER, VEHICLE_TYPES } from '../src/lib/constants'
-import { formatDateTimeShort } from '../src/lib/format'
-import { useUserLocation } from '../src/lib/location'
-import { useDebouncedCallback } from '../src/lib/useDebouncedCallback'
-import { colors, font, space } from '../src/theme'
+import { useTheme } from '@spark/ui'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Pressable, StyleSheet, View } from 'react-native'
+
+import { defaultEnd, defaultStart, type BookingValue } from '../../src/components/BookingForm'
+import { BottomSheet, type SortMode } from '../../src/components/BottomSheet'
+import { Map } from '../../src/components/map'
+import type { MapBounds, MapRegion } from '../../src/components/map'
+import { useLanguage } from '../../src/i18n/LanguageProvider'
+import {
+  searchFacilities,
+  type FacilityCluster,
+  type FacilitySearchResult,
+} from '../../src/lib/api'
+import { FALLBACK_CENTER, vehicleLabel } from '../../src/lib/constants'
+import { openDirections } from '../../src/lib/directions'
+import { formatDateTimeShort } from '../../src/lib/format'
+import { useUserLocation } from '../../src/lib/location'
+import { useDebouncedCallback } from '../../src/lib/useDebouncedCallback'
+import { useOverlay } from '../../src/navigation/OverlayContext'
+import { space } from '../../src/theme'
 
 const MIN_RADIUS = 300
 const MAX_RADIUS = 50_000
@@ -71,13 +71,14 @@ function defaultWindow(): BookingValue {
   }
 }
 
-export default function HomeScreen() {
+export default function MapScreen() {
+  const { colors } = useTheme()
+  const { t, locale } = useLanguage()
   const { coords, status, retry } = useUserLocation()
+  const { openFacilityDetail, openTimePicker, openFilters } = useOverlay()
 
   const [applied, setApplied] = useState<BookingValue>(defaultWindow)
   const [sortMode, setSortMode] = useState<SortMode>('nearby')
-  const [costSheetOpen, setCostSheetOpen] = useState(false)
-  const [costDraft, setCostDraft] = useState<BookingValue>(applied)
   const [center, setCenter] = useState(FALLBACK_CENTER)
   const [centerNonce, setCenterNonce] = useState(0)
   const [viewport, setViewport] = useState<MapRegion | null>(null)
@@ -178,7 +179,7 @@ export default function HomeScreen() {
       .catch((e) => {
         if (e instanceof Error && e.name === 'AbortError') return
         lastFetched.current = null
-        setError(e instanceof Error ? e.message : 'Η αναζήτηση απέτυχε')
+        setError(e instanceof Error ? e.message : t('mapSearchFailed'))
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false)
@@ -222,15 +223,14 @@ export default function HomeScreen() {
 
   const costLabel = useMemo(() => {
     if (sortMode !== 'cost') return null
-    const vehicle = VEHICLE_TYPES.find((v) => v.value === applied.vehicleType)?.label ?? ''
-    return `Κόστος: ${formatDateTimeShort(applied.startsAt)} · ${vehicle}`
-  }, [sortMode, applied.startsAt, applied.vehicleType])
+    const vehicle = vehicleLabel(applied.vehicleType, t)
+    return `${t('mapCostLabelPrefix')}${formatDateTimeShort(applied.startsAt, locale)} · ${vehicle}`
+  }, [sortMode, applied.startsAt, applied.vehicleType, t, locale])
 
-  const applyCostSort = useCallback(() => {
-    setApplied(costDraft)
+  const openCostPicker = useCallback(() => {
     setSortMode('cost')
-    setCostSheetOpen(false)
-  }, [costDraft])
+    openTimePicker(applied, (next) => setApplied(next))
+  }, [applied, openTimePicker])
 
   const onRegionChange = useDebouncedCallback((region: MapRegion) => {
     // Always track the visible area so the list shows only in-view spots, even
@@ -256,17 +256,9 @@ export default function HomeScreen() {
 
   const openFacility = useCallback(
     (id: string) => {
-      router.push({
-        pathname: '/facility/[id]',
-        params: {
-          id,
-          startsAt: applied.startsAt,
-          endsAt: applied.endsAt,
-          vehicleType: applied.vehicleType,
-        },
-      })
+      openFacilityDetail(id, applied)
     },
-    [applied.startsAt, applied.endsAt, applied.vehicleType],
+    [openFacilityDetail, applied],
   )
 
   const navigateTo = useCallback(
@@ -304,13 +296,29 @@ export default function HomeScreen() {
       </View>
 
       <Pressable
+        onPress={openFilters}
+        style={({ pressed }) => [
+          styles.fab,
+          styles.fabFilters,
+          { backgroundColor: colors.surface },
+          pressed && styles.fabPressed,
+        ]}
+      >
+        <MaterialIcons name="tune" size={22} color={colors.pri} />
+      </Pressable>
+
+      <Pressable
         onPress={locateMe}
-        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        style={({ pressed }) => [
+          styles.fab,
+          { backgroundColor: colors.surface },
+          pressed && styles.fabPressed,
+        ]}
       >
         <MaterialIcons
           name={status === 'denied' ? 'gps-off' : atUser ? 'gps-fixed' : 'gps-not-fixed'}
           size={22}
-          color={colors.primary}
+          color={colors.pri}
         />
       </Pressable>
 
@@ -323,18 +331,9 @@ export default function HomeScreen() {
         collapse={collapseNonce}
         sortMode={sortMode}
         onSortNearby={() => setSortMode('nearby')}
-        onSortCost={() => setCostSheetOpen(true)}
+        onSortCost={openCostPicker}
         costLabel={costLabel}
       />
-
-      <Sheet open={costSheetOpen} onClose={() => setCostSheetOpen(false)}>
-        <Text style={styles.costTitle}>Ταξινόμηση κατά κόστος</Text>
-        <Text style={styles.costSub}>
-          Διάλεξε ώρα και όχημα για να δεις το ελάχιστο κόστος στάθμευσης.
-        </Text>
-        <BookingForm initial={applied} onChange={setCostDraft} />
-        <Button label="Εφαρμογή" icon="pricetag-outline" onPress={applyCostSort} />
-      </Sheet>
     </View>
   )
 }
@@ -348,7 +347,6 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -357,7 +355,6 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 6,
   },
+  fabFilters: { bottom: 148 + 48 + space.sm },
   fabPressed: { opacity: 0.85 },
-  costTitle: { fontSize: font.heading, fontWeight: '700', color: colors.textMain },
-  costSub: { fontSize: font.small, color: colors.textSecondary, marginTop: -space.sm },
 })

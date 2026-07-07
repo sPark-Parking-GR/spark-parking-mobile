@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
+import { radii, spacing, typography, useTheme } from '@spark/ui'
 import { useEffect, useRef, type ElementRef } from 'react'
 import { StyleSheet, Text, View } from 'react-native'
 import MapView, {
@@ -13,7 +14,6 @@ import { MapPin, PIN_ANCHOR } from './logo'
 import type { MapProps } from './types'
 import type { FacilitySearchResult } from '../../lib/api'
 import { formatDistance } from '../../lib/format'
-import { colors, font, radius, space } from '../../theme'
 
 function metaLine(r: FacilitySearchResult): string {
   return (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters)
@@ -59,6 +59,7 @@ export function NativeMap({
   onMapPress,
   onSpotSelect,
 }: MapProps) {
+  const { colors } = useTheme()
   const ref = useRef<MapView>(null)
   const markerRefs = useRef<Record<string, ElementRef<typeof Marker> | null>>({})
   const selectedId = useRef<string | null>(null)
@@ -161,22 +162,31 @@ export function NativeMap({
             )
           }}
         >
-          <MapPin available={r.available} />
+          <MapPin available={r.available} colors={colors} />
           <Callout tooltip>
-            <View style={styles.callout}>
-              <Text style={styles.calloutName}>{r.name}</Text>
-              <Text style={styles.calloutAddr}>{r.address}</Text>
-              <Text style={styles.calloutMeta}>{metaLine(r)}</Text>
+            <View
+              style={[
+                styles.callout,
+                { backgroundColor: colors.surface, borderColor: colors.line },
+              ]}
+            >
+              <Text style={[styles.calloutName, { color: colors.ink }]}>{r.name}</Text>
+              <Text style={[styles.calloutAddr, { color: colors.muted }]}>{r.address}</Text>
+              <Text style={[styles.calloutMeta, { color: colors.ink }]}>{metaLine(r)}</Text>
               <View style={styles.calloutActions}>
                 <CalloutSubview style={styles.calloutBtn} onPress={() => onMarkerPress(r.id)}>
-                  <Text style={styles.calloutCta}>Λεπτομέρειες →</Text>
+                  <Text style={[styles.calloutCta, { color: colors.pri }]}>Λεπτομέρειες →</Text>
                 </CalloutSubview>
                 <CalloutSubview
-                  style={[styles.calloutBtn, styles.calloutBtnDirections]}
+                  style={[
+                    styles.calloutBtn,
+                    styles.calloutBtnDirections,
+                    { borderLeftColor: colors.line },
+                  ]}
                   onPress={() => onDirections(r.id)}
                 >
-                  <Ionicons name="navigate" size={14} color={colors.primary} />
-                  <Text style={styles.calloutCta}>Οδηγίες</Text>
+                  <Ionicons name="navigate" size={14} color={colors.pri} />
+                  <Text style={[styles.calloutCta, { color: colors.pri }]}>Οδηγίες</Text>
                 </CalloutSubview>
               </View>
             </View>
@@ -197,8 +207,10 @@ export function NativeMap({
             onClusterPress?.(c)
           }}
         >
-          <View style={styles.cluster}>
-            <Text style={styles.clusterText}>{c.count}</Text>
+          <View
+            style={[styles.cluster, { backgroundColor: colors.pri, borderColor: colors.surface }]}
+          >
+            <Text style={[styles.clusterText, { color: colors.ink }]}>{c.count}</Text>
           </View>
         </Marker>
       ))}
@@ -212,43 +224,38 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: colors.primary,
     borderWidth: 2,
-    borderColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  clusterText: { color: colors.textMain, fontSize: font.small, fontWeight: '700' },
+  clusterText: { fontSize: typography.body.fontSize, fontWeight: '700' },
   callout: {
     minWidth: 180,
     gap: 2,
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    paddingVertical: space.sm,
-    paddingHorizontal: space.md,
+    borderRadius: radii.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
     shadowColor: '#000',
     shadowOpacity: 0.45,
     shadowRadius: 12,
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-  calloutName: { fontSize: 14, fontWeight: '600', color: colors.textMain },
-  calloutAddr: { fontSize: font.tiny, color: colors.textSecondary },
-  calloutMeta: { fontSize: font.small, color: colors.textMain, marginTop: 2 },
+  calloutName: { fontSize: 14, fontWeight: '600' },
+  calloutAddr: { fontSize: typography.caption.fontSize },
+  calloutMeta: { fontSize: typography.body.fontSize, marginTop: 2 },
   calloutActions: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: space.md,
-    marginTop: space.sm,
+    gap: spacing.md,
+    marginTop: spacing.sm,
   },
   calloutBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: 2 },
   calloutBtnDirections: {
     borderLeftWidth: 1,
-    borderLeftColor: colors.border,
-    paddingLeft: space.md,
+    paddingLeft: spacing.md,
   },
-  calloutCta: { fontSize: font.small, fontWeight: '600', color: colors.primary },
+  calloutCta: { fontSize: typography.body.fontSize, fontWeight: '600' },
 })

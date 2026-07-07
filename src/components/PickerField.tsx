@@ -1,8 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
+import { spacing, typography, useTheme } from '@spark/ui'
 import { useState } from 'react'
 import { FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native'
-
-import { colors, font, radius, space } from '../theme'
 
 export interface PickerOption {
   label: string
@@ -22,6 +21,7 @@ export function PickerField({
   value: string
   onChange: (value: string) => void
 }) {
+  const { colors, radii } = useTheme()
   const [open, setOpen] = useState(false)
   const selected = options.find((o) => o.value === value)
 
@@ -29,24 +29,48 @@ export function PickerField({
     <>
       <Pressable
         onPress={() => setOpen(true)}
-        style={({ pressed }) => [styles.field, pressed && styles.pressed]}
+        style={({ pressed }) => [
+          styles.field,
+          { borderColor: colors.line, borderRadius: radii.sm, backgroundColor: colors.surface },
+          pressed && { borderColor: colors.pri, backgroundColor: colors.priSoft },
+        ]}
       >
-        <View style={styles.iconBox}>
-          <Ionicons name={icon} size={18} color={colors.primary} />
+        <View style={[styles.iconBox, { backgroundColor: colors.card2 }]}>
+          <Ionicons name={icon} size={18} color={colors.pri} />
         </View>
         <View style={styles.text}>
-          <Text style={styles.label}>{label}</Text>
-          <Text style={styles.value} numberOfLines={1}>
+          <Text
+            style={[styles.label, { fontSize: typography.caption.fontSize, color: colors.muted }]}
+          >
+            {label}
+          </Text>
+          <Text
+            style={[styles.value, { fontSize: typography.body.fontSize, color: colors.ink }]}
+            numberOfLines={1}
+          >
             {selected?.label ?? '—'}
           </Text>
         </View>
-        <Ionicons name="chevron-down" size={18} color={colors.textSecondary} />
+        <Ionicons name="chevron-down" size={18} color={colors.muted} />
       </Pressable>
 
       <Modal visible={open} transparent animationType="slide" onRequestClose={() => setOpen(false)}>
         <Pressable style={styles.backdrop} onPress={() => setOpen(false)}>
-          <Pressable style={styles.sheet}>
-            <Text style={styles.sheetTitle}>{label}</Text>
+          <Pressable
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: colors.surface,
+                borderTopLeftRadius: radii.lg,
+                borderTopRightRadius: radii.lg,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.sheetTitle, { fontSize: typography.body.fontSize, color: colors.ink }]}
+            >
+              {label}
+            </Text>
             <FlatList
               data={options}
               keyExtractor={(o) => o.value}
@@ -54,16 +78,25 @@ export function PickerField({
                 const active = item.value === value
                 return (
                   <Pressable
-                    style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+                    style={({ pressed }) => [
+                      styles.row,
+                      pressed && { backgroundColor: colors.card2 },
+                    ]}
                     onPress={() => {
                       onChange(item.value)
                       setOpen(false)
                     }}
                   >
-                    <Text style={[styles.rowText, active && styles.rowTextActive]}>
+                    <Text
+                      style={[
+                        styles.rowText,
+                        { fontSize: typography.body.fontSize, color: colors.ink },
+                        active && { color: colors.pri, fontWeight: '600' },
+                      ]}
+                    >
                       {item.label}
                     </Text>
-                    {active ? <Ionicons name="checkmark" size={18} color={colors.primary} /> : null}
+                    {active ? <Ionicons name="checkmark" size={18} color={colors.pri} /> : null}
                   </Pressable>
                 )
               }}
@@ -83,50 +116,36 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surface,
   },
-  pressed: { borderColor: colors.primary, backgroundColor: colors.primaryTint },
   iconBox: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: colors.neutralBg,
     alignItems: 'center',
     justifyContent: 'center',
   },
   text: { flex: 1 },
   label: {
-    fontSize: 11,
     fontWeight: '600',
-    color: colors.textSecondary,
     textTransform: 'uppercase',
   },
-  value: { fontSize: font.body, color: colors.textMain, fontWeight: '600' },
+  value: { fontWeight: '600' },
   backdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.3)', justifyContent: 'flex-end' },
   sheet: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: radius.lg,
-    borderTopRightRadius: radius.lg,
-    paddingVertical: space.md,
+    paddingVertical: spacing.md,
     maxHeight: '60%',
   },
   sheetTitle: {
-    fontSize: font.body,
     fontWeight: '600',
-    color: colors.textMain,
-    paddingHorizontal: space.md,
-    paddingBottom: space.sm,
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingVertical: 14,
-    paddingHorizontal: space.md,
+    paddingHorizontal: spacing.md,
   },
-  rowPressed: { backgroundColor: colors.neutralBg },
-  rowText: { fontSize: font.body, color: colors.textMain },
-  rowTextActive: { color: colors.primary, fontWeight: '600' },
+  rowText: {},
 })

@@ -1,26 +1,19 @@
 import { Ionicons } from '@expo/vector-icons'
+import { typography, useTheme } from '@spark/ui'
 import { useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { WheelPicker } from 'react-native-infinite-wheel-picker'
 
-import { formatDateTimeShort } from '../lib/format'
-import { colors, font, radius } from '../theme'
 import { Sheet } from './Sheet'
+import { useLanguage } from '../i18n/LanguageProvider'
+import type { Locale } from '../i18n/messages'
+import { formatDateTimeShort } from '../lib/format'
 
-const MONTHS = [
-  'Ιανουαρίου',
-  'Φεβρουαρίου',
-  'Μαρτίου',
-  'Απριλίου',
-  'Μαΐου',
-  'Ιουνίου',
-  'Ιουλίου',
-  'Αυγούστου',
-  'Σεπτεμβρίου',
-  'Οκτωβρίου',
-  'Νοεμβρίου',
-  'Δεκεμβρίου',
-]
+function monthName(month: number, locale: Locale): string {
+  const intlLocale = locale === 'en' ? 'en-US' : 'el-GR'
+  return new Intl.DateTimeFormat(intlLocale, { month: 'long' }).format(new Date(2020, month, 1))
+}
+
 const ITEM_H = 44
 const VISIBLE = 5
 const REST = 2
@@ -65,6 +58,19 @@ export function DateTimeField({
   anchor?: Date
   onChange: (date: Date) => void
 }) {
+  const { colors, radii } = useTheme()
+  const { locale, t } = useLanguage()
+  const selectionStyle = {
+    backgroundColor: colors.priSoft,
+    borderWidth: 1,
+    borderColor: colors.pri,
+    borderRadius: radii.sm,
+  }
+  const itemTextStyle = {
+    fontSize: typography.body.fontSize,
+    fontWeight: '600' as const,
+    color: colors.ink,
+  }
   const [open, setOpen] = useState(false)
   const [draft, setDraft] = useState(value)
   const [tab, setTab] = useState<'date' | 'time'>('date')
@@ -107,7 +113,10 @@ export function DateTimeField({
   const minMinute = onMinHour ? min.getMinutes() : 0
   const minute = Math.min(Math.max(draft.getMinutes(), minMinute), 59)
 
-  const monthData = useMemo(() => range(minMonth, 11).map((m) => MONTHS[m]!), [minMonth])
+  const monthData = useMemo(
+    () => range(minMonth, 11).map((m) => monthName(m, locale)),
+    [minMonth, locale],
+  )
   const dayData = useMemo(() => range(minDay, monthLast).map(String), [minDay, monthLast])
   const hourData = useMemo(() => range(minHour, 23).map(pad), [minHour])
   const minuteData = useMemo(() => range(minMinute, 59).map(pad), [minMinute])
@@ -181,42 +190,66 @@ export function DateTimeField({
     <>
       <Pressable
         onPress={openPicker}
-        style={({ pressed }) => [styles.chip, pressed && styles.chipPressed]}
+        style={({ pressed }) => [
+          styles.chip,
+          { borderColor: colors.line, borderRadius: radii.sm, backgroundColor: colors.surface },
+          pressed && { borderColor: colors.pri, backgroundColor: colors.priSoft },
+        ]}
       >
-        <View style={styles.chipIcon}>
-          <Ionicons name={icon} size={16} color={colors.primary} />
+        <View style={[styles.chipIcon, { backgroundColor: colors.priSoft }]}>
+          <Ionicons name={icon} size={16} color={colors.pri} />
         </View>
         <View style={styles.text}>
-          <Text style={styles.label}>{label}</Text>
-          <Text style={styles.value} numberOfLines={1}>
-            {formatDateTimeShort(value.toISOString())}
+          <Text style={[styles.label, { color: colors.muted }]}>{label}</Text>
+          <Text
+            style={[styles.value, { fontSize: typography.body.fontSize, color: colors.ink }]}
+            numberOfLines={1}
+          >
+            {formatDateTimeShort(value.toISOString(), locale)}
           </Text>
         </View>
-        <Ionicons name="chevron-down" size={16} color={colors.textSecondary} />
+        <Ionicons name="chevron-down" size={16} color={colors.muted} />
       </Pressable>
 
       <Sheet open={open} onClose={() => setOpen(false)}>
         <View style={styles.header}>
-          <Text style={styles.headerLabel}>{label}</Text>
-          <Text style={styles.headerValue}>{formatDateTimeShort(draft.toISOString())}</Text>
+          <Text style={[styles.headerLabel, { color: colors.muted }]}>{label}</Text>
+          <Text
+            style={[
+              styles.headerValue,
+              { fontSize: typography.heading.fontSize, color: colors.ink },
+            ]}
+          >
+            {formatDateTimeShort(draft.toISOString(), locale)}
+          </Text>
         </View>
 
-        <View style={styles.toggle}>
-          {(['date', 'time'] as const).map((t) => {
-            const active = tab === t
+        <View style={[styles.toggle, { backgroundColor: colors.card2, borderRadius: radii.sm }]}>
+          {(['date', 'time'] as const).map((tabKey) => {
+            const active = tab === tabKey
             return (
               <Pressable
-                key={t}
-                onPress={() => setTab(t)}
-                style={[styles.toggleBtn, active && styles.toggleBtnActive]}
+                key={tabKey}
+                onPress={() => setTab(tabKey)}
+                style={[
+                  styles.toggleBtn,
+                  { borderRadius: radii.sm - 3 },
+                  active && { backgroundColor: colors.pri, ...styles.toggleBtnActive },
+                ]}
               >
                 <Ionicons
-                  name={t === 'date' ? 'calendar-outline' : 'time-outline'}
+                  name={tabKey === 'date' ? 'calendar-outline' : 'time-outline'}
                   size={16}
-                  color={active ? '#fff' : colors.textSecondary}
+                  color={active ? '#fff' : colors.muted}
                 />
-                <Text style={[styles.toggleText, active && styles.toggleTextActive]}>
-                  {t === 'date' ? 'Ημερομηνία' : 'Ώρα'}
+                <Text
+                  style={[
+                    styles.toggleText,
+                    { fontSize: typography.body.fontSize, color: colors.muted },
+                    active && styles.toggleTextActive,
+                  ]}
+                >
+                  {tabKey === 'date' ? t('dateTabLabel') : t('timeTabLabel')}
                 </Text>
               </Pressable>
             )
@@ -238,8 +271,8 @@ export function DateTimeField({
                 decelerationRate="normal"
                 flatListProps={LIST_PROPS}
                 containerStyle={[styles.wheel, styles.wheelWide]}
-                selectedLayoutStyle={styles.selection}
-                elementTextStyle={styles.itemText}
+                selectedLayoutStyle={selectionStyle}
+                elementTextStyle={itemTextStyle}
                 elementContainerStyle={styles.itemContainer}
               />
               <WheelPicker
@@ -254,8 +287,8 @@ export function DateTimeField({
                 decelerationRate="normal"
                 flatListProps={LIST_PROPS}
                 containerStyle={styles.wheel}
-                selectedLayoutStyle={styles.selection}
-                elementTextStyle={styles.itemText}
+                selectedLayoutStyle={selectionStyle}
+                elementTextStyle={itemTextStyle}
                 elementContainerStyle={styles.itemContainer}
               />
             </>
@@ -273,11 +306,15 @@ export function DateTimeField({
                 decelerationRate="normal"
                 flatListProps={LIST_PROPS}
                 containerStyle={styles.wheel}
-                selectedLayoutStyle={styles.selection}
-                elementTextStyle={styles.itemText}
+                selectedLayoutStyle={selectionStyle}
+                elementTextStyle={itemTextStyle}
                 elementContainerStyle={styles.itemContainer}
               />
-              <Text style={styles.colon}>:</Text>
+              <Text
+                style={[styles.colon, { fontSize: typography.heading.fontSize, color: colors.ink }]}
+              >
+                :
+              </Text>
               <WheelPicker
                 key={`min-${minMinute}`}
                 data={minuteData}
@@ -290,8 +327,8 @@ export function DateTimeField({
                 decelerationRate="normal"
                 flatListProps={LIST_PROPS}
                 containerStyle={styles.wheel}
-                selectedLayoutStyle={styles.selection}
-                elementTextStyle={styles.itemText}
+                selectedLayoutStyle={selectionStyle}
+                elementTextStyle={itemTextStyle}
                 elementContainerStyle={styles.itemContainer}
               />
             </>
@@ -311,16 +348,11 @@ const styles = StyleSheet.create({
     minHeight: 56,
     paddingHorizontal: 12,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
-    backgroundColor: colors.surface,
   },
-  chipPressed: { borderColor: colors.primary, backgroundColor: colors.primaryTint },
   chipIcon: {
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: colors.primaryTint,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -328,24 +360,20 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.textSecondary,
     textTransform: 'uppercase',
   },
-  value: { fontSize: font.small, color: colors.textMain, fontWeight: '600' },
+  value: { fontWeight: '600' },
 
   header: { alignItems: 'center', gap: 2 },
   headerLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: colors.textSecondary,
     textTransform: 'uppercase',
   },
-  headerValue: { fontSize: font.heading, fontWeight: '700', color: colors.textMain },
+  headerValue: { fontWeight: '700' },
 
   toggle: {
     flexDirection: 'row',
-    backgroundColor: colors.neutralBg,
-    borderRadius: radius.sm,
     padding: 3,
     gap: 3,
   },
@@ -356,17 +384,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 6,
     paddingVertical: 9,
-    borderRadius: radius.sm - 3,
   },
   toggleBtnActive: {
-    backgroundColor: colors.primary,
     shadowColor: '#000',
     shadowOpacity: 0.15,
     shadowRadius: 4,
     shadowOffset: { width: 0, height: 1 },
     elevation: 2,
   },
-  toggleText: { fontSize: font.small, fontWeight: '600', color: colors.textSecondary },
+  toggleText: { fontWeight: '600' },
   toggleTextActive: { color: '#fff' },
 
   wheels: {
@@ -378,17 +404,8 @@ const styles = StyleSheet.create({
   wheel: { flex: 1 },
   wheelWide: { flex: 1.8 },
   itemContainer: { paddingHorizontal: 4 },
-  itemText: { fontSize: font.body, fontWeight: '600', color: colors.textMain },
-  selection: {
-    backgroundColor: colors.primaryTint,
-    borderWidth: 1,
-    borderColor: colors.primaryTintBorder,
-    borderRadius: radius.sm,
-  },
   colon: {
-    fontSize: font.heading,
     fontWeight: '700',
-    color: colors.textMain,
     paddingHorizontal: 4,
   },
 })

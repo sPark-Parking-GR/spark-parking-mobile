@@ -1,4 +1,18 @@
+import type { ThemeContextValue } from '@spark/ui'
 import Svg, { Defs, G, LinearGradient, Path, Stop } from 'react-native-svg'
+
+export type PinColors = Pick<
+  ThemeContextValue['colors'],
+  'pri' | 'pri2' | 'map' | 'card2' | 'faint'
+>
+
+function pinGradientStops(colors: PinColors) {
+  return [
+    { offset: '0', color: colors.pri2 },
+    { offset: '0.495', color: colors.pri },
+    { offset: '0.803', color: colors.pri },
+  ] as const
+}
 
 // sPark brand mark (assets/logo_transparent.svg) — already a map pin.
 export const LOGO_VIEWBOX = '0 0 318 421'
@@ -59,9 +73,6 @@ const PIN_VIEWBOX = `${-PIN_PAD} ${-PIN_PAD} ${VB_W} ${VB_H}`
 // Silhouette tip (bottom point) in logo space — anchors the pin on the coordinate.
 const TIP_X = 159
 const TIP_Y = 412
-const PIN_MUTED_BG = '#3a4048'
-const PIN_MUTED_FG = '#cbd1d8'
-
 // Shrink the mark inside the silhouette so navy breathes around the ribbon.
 const LOGO_SCALE = 0.78
 const LOGO_CX = 158.9
@@ -73,19 +84,21 @@ const LOGO_TRANSFORM = `translate(${LOGO_CX * (1 - LOGO_SCALE)} ${LOGO_CY * (1 -
 export const PIN_SIZE = { width: PIN_WIDTH, height: (PIN_WIDTH * VB_H) / VB_W }
 export const PIN_ANCHOR = { x: (TIP_X + PIN_PAD) / VB_W, y: (TIP_Y + PIN_PAD) / VB_H }
 
-function gradientStops() {
-  return LOGO_GRADIENT.map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`).join('')
+function gradientStopsMarkup(colors: PinColors): string {
+  return pinGradientStops(colors)
+    .map((s) => `<stop offset="${s.offset}" stop-color="${s.color}"/>`)
+    .join('')
 }
 
 // SVG markup string for the WebView (Leaflet) renderer.
-export function pinSvgMarkup(available: boolean): string {
-  const back = available ? MARK_BG : PIN_MUTED_BG
-  const fg = available ? 'url(#sparkMark)' : PIN_MUTED_FG
+export function pinSvgMarkup(available: boolean, colors: PinColors): string {
+  const back = available ? colors.map : colors.card2
+  const fg = available ? 'url(#sparkMark)' : colors.faint
   const silhouette = `<path d="${PIN_SILHOUETTE}" fill="${back}" stroke="${back}" stroke-width="${PIN_RIM}" stroke-linejoin="round"/>`
   const fgPaths = `<g transform="${LOGO_TRANSFORM}">${LOGO_PATHS.map((d) => `<path d="${d}" fill="${fg}"/>`).join('')}</g>`
   return (
     `<svg width="${PIN_SIZE.width}" height="${PIN_SIZE.height}" viewBox="${PIN_VIEWBOX}">` +
-    `<defs><linearGradient id="sparkMark" x1="0" y1="0" x2="1" y2="1">${gradientStops()}</linearGradient></defs>` +
+    `<defs><linearGradient id="sparkMark" x1="0" y1="0" x2="1" y2="1">${gradientStopsMarkup(colors)}</linearGradient></defs>` +
     silhouette +
     fgPaths +
     `</svg>`
@@ -93,14 +106,14 @@ export function pinSvgMarkup(available: boolean): string {
 }
 
 // Native (react-native-svg) marker.
-export function MapPin({ available }: { available: boolean }) {
-  const back = available ? MARK_BG : PIN_MUTED_BG
-  const fg = available ? 'url(#sparkMark)' : PIN_MUTED_FG
+export function MapPin({ available, colors }: { available: boolean; colors: PinColors }) {
+  const back = available ? colors.map : colors.card2
+  const fg = available ? 'url(#sparkMark)' : colors.faint
   return (
     <Svg width={PIN_SIZE.width} height={PIN_SIZE.height} viewBox={PIN_VIEWBOX}>
       <Defs>
         <LinearGradient id="sparkMark" x1="0" y1="0" x2="1" y2="1">
-          {LOGO_GRADIENT.map((s) => (
+          {pinGradientStops(colors).map((s) => (
             <Stop key={s.offset} offset={s.offset} stopColor={s.color} />
           ))}
         </LinearGradient>

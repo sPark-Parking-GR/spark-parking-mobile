@@ -63,36 +63,39 @@ export interface FacilityDetail {
   amenities: string[]
   cancellationPolicy: string
   images: { id: string; url: string; altText: string | null }[]
-  tariffPlans: {
-    id: string
-    name: string
-    isDefault: boolean
-    timezone: string
-    graceMinutes: number
-    incrementMinutes: number
-    version: number
-    vehicleTypes: string[]
-    tiers: {
+  tariffAssignments: {
+    vehicleType: string
+    tariffPlan: {
       id: string
-      fromMinute: number
-      toMinute: number | null
-      unit: string
-      blockMinutes: number | null
-      rates: { id: string; windowId: string; priceCents: number; currency: string }[]
-    }[]
-    windows: {
-      id: string
-      label: string
-      dayMask: number
-      startMinute: number
-      endMinute: number
-    }[]
-    caps: {
-      id: string
-      windowMinutes: number
-      capCents: number
-      scope: string
-    }[]
+      name: string
+      isDefault: boolean
+      timezone: string
+      graceMinutes: number
+      incrementMinutes: number
+      version: number
+      vehicleTypes: string[]
+      tiers: {
+        id: string
+        fromMinute: number
+        toMinute: number | null
+        unit: string
+        blockMinutes: number | null
+        rates: { id: string; windowId: string; priceCents: number; currency: string }[]
+      }[]
+      windows: {
+        id: string
+        label: string
+        dayMask: number
+        startMinute: number
+        endMinute: number
+      }[]
+      caps: {
+        id: string
+        windowMinutes: number
+        capCents: number
+        scope: string
+      }[]
+    } | null
   }[]
   rating: { average: number | null; count: number }
 }
