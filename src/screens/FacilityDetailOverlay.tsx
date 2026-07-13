@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
+import { computeDistanceMeters } from '@spark/maps'
 import { spacing, typography, useTheme } from '@spark/ui'
 import { useEffect, useState } from 'react'
 import {
@@ -11,19 +12,39 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
 import { defaultEnd, defaultStart, type BookingValue } from '../components/BookingForm'
-import { Badge, Button, Card } from '../components/ui'
+import { LogoMark } from '../components/map/logo'
+import { Button, Card } from '../components/ui'
 import { useLanguage } from '../i18n/LanguageProvider'
 import type { Locale } from '../i18n/messages'
 import { getFacility, getQuote, type FacilityDetail, type PriceQuote } from '../lib/api'
 import { vehicleLabel } from '../lib/constants'
 import { openDirections } from '../lib/directions'
-import { formatMoney, formatTimeRange } from '../lib/format'
+import { formatDistance, formatMoney, formatTimeRange } from '../lib/format'
+import { useUserLocation } from '../lib/location'
 import { useSavedFacilities } from '../lib/savedFacilities'
 import { useOverlay } from '../navigation/OverlayContext'
 
-const HERO_HEIGHT = 188
+function Chip({ label, warning }: { label: string; warning?: boolean }) {
+  const { colors } = useTheme()
+  return (
+    <View
+      style={[
+        styles.chip,
+        {
+          backgroundColor: warning ? colors.warnBg : colors.surface,
+          borderColor: warning ? colors.warnBg : colors.line,
+        },
+      ]}
+    >
+      <Text style={[styles.chipText, { color: warning ? colors.warn : colors.ink }]}>{label}</Text>
+    </View>
+  )
+}
+
+const HERO_HEIGHT = 180
 
 function defaultBooking(): BookingValue {
   const start = defaultStart()
@@ -64,8 +85,8 @@ function PricingCard({
   const dailyCap = plan.caps.find((c) => c.windowMinutes === 1440)
 
   return (
-    <Card style={styles.card}>
-      <Text style={[styles.cardTitle, { color: colors.ink }]}>{t('pricingTitle')}</Text>
+    <Card style={[styles.card, styles.cardRadius]}>
+      <Text style={[styles.cardTitle, { color: colors.muted }]}>{t('pricingTitle')}</Text>
       {plan.windows.length > 0 && (
         <View style={styles.pricingSection}>
           {plan.windows.map((w) => (
@@ -154,6 +175,7 @@ export function FacilityDetailOverlay({
   const { t, locale } = useLanguage()
   const insets = useSafeAreaInsets()
   const { colors } = useTheme()
+  const { coords } = useUserLocation()
 
   const [facility, setFacility] = useState<FacilityDetail | null>(null)
   const [booking, setBooking] = useState<BookingValue | null>(initialBooking ?? null)
@@ -263,9 +285,24 @@ export function FacilityDetailOverlay({
     )
   }
 
+  const distanceLabel =
+    coords != null ? formatDistance(computeDistanceMeters(coords, facility)) : null
+
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
-      <View style={[styles.hero, { height: HERO_HEIGHT, backgroundColor: colors.pri }]}>
+      <View style={[styles.hero, { height: HERO_HEIGHT }]}>
+        <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="1">
+              <Stop offset="0" stopColor={colors.pri} />
+              <Stop offset="1" stopColor={colors.pri2} />
+            </LinearGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#heroGrad)" />
+        </Svg>
+        <View style={styles.heroWatermark}>
+          <LogoMark size={150} color="#fff" />
+        </View>
         {heroButtons}
         <View style={styles.heroContent}>
           <Text style={styles.heroTitle}>{facility.name}</Text>
@@ -276,7 +313,10 @@ export function FacilityDetailOverlay({
             style={({ pressed }) => [styles.directions, pressed && styles.directionsPressed]}
           >
             <Ionicons name="navigate-circle" size={18} color="#fff" />
-            <Text style={styles.heroAddress}>{facility.address}</Text>
+            <Text style={styles.heroAddress}>
+              {facility.address}
+              {distanceLabel ? ` · ${distanceLabel}` : ''}
+            </Text>
           </Pressable>
           {facility.rating.average != null ? (
             <Text style={styles.heroRating}>
@@ -287,16 +327,16 @@ export function FacilityDetailOverlay({
       </View>
 
       <ScrollView contentContainerStyle={[styles.content, { paddingTop: spacing.md }]}>
-        <Card style={styles.card}>
-          <Text style={[styles.cardTitle, { color: colors.ink }]}>{t('amenitiesTitle')}</Text>
+        <Card style={[styles.card, styles.cardRadius]}>
+          <Text style={[styles.cardTitle, { color: colors.muted }]}>{t('amenitiesTitle')}</Text>
           <View style={styles.wrap}>
             {facility.amenities.map((a) => (
-              <Badge key={a} label={a} variant="neutral" />
+              <Chip key={a} label={a} />
             ))}
             {facility.heightRestrictionCm ? (
-              <Badge
+              <Chip
                 label={`${t('heightRestrictionPrefix')} ${facility.heightRestrictionCm}cm`}
-                variant="warning"
+                warning
               />
             ) : null}
           </View>
@@ -307,15 +347,24 @@ export function FacilityDetailOverlay({
           ) : null}
         </Card>
 
-        <Card style={styles.card}>
-          <Text style={[styles.cardTitle, { color: colors.ink }]}>{t('bookingDetailsTitle')}</Text>
+        <Card style={[styles.card, styles.cardRadius]}>
+          <Text style={[styles.cardTitle, { color: colors.muted }]}>
+            {t('bookingDetailsTitle')}
+          </Text>
           <Pressable
             onPress={() =>
               openTimePicker(booking ?? initialBooking ?? defaultBooking(), setBooking)
             }
-            style={({ pressed }) => [styles.pickRow, pressed && styles.pickRowPressed]}
+            style={({ pressed }) => [
+              styles.pickRow,
+              { backgroundColor: colors.card2, borderColor: colors.line },
+              pressed && styles.pickRowPressed,
+            ]}
           >
-            <Text style={[styles.rowLabel, { color: colors.muted }]}>{t('bookingDuration')}</Text>
+            <Ionicons name="time-outline" size={16} color={colors.ink} />
+            <Text style={[styles.rowLabel, styles.pickLabel, { color: colors.muted }]}>
+              {t('bookingDuration')}
+            </Text>
             <View style={styles.pickValue}>
               <Text style={[styles.rowValue, { color: colors.ink }]}>
                 {booking
@@ -325,14 +374,21 @@ export function FacilityDetailOverlay({
               <Ionicons name="chevron-forward" size={16} color={colors.muted} />
             </View>
           </Pressable>
-          <View style={[styles.divider, { backgroundColor: colors.line }]} />
           <Pressable
             onPress={() =>
               openTimePicker(booking ?? initialBooking ?? defaultBooking(), setBooking)
             }
-            style={({ pressed }) => [styles.pickRow, pressed && styles.pickRowPressed]}
+            style={({ pressed }) => [
+              styles.pickRow,
+              styles.pickRowLast,
+              { backgroundColor: colors.card2, borderColor: colors.line },
+              pressed && styles.pickRowPressed,
+            ]}
           >
-            <Text style={[styles.rowLabel, { color: colors.muted }]}>{t('bookingVehicle')}</Text>
+            <Ionicons name="car-outline" size={16} color={colors.ink} />
+            <Text style={[styles.rowLabel, styles.pickLabel, { color: colors.muted }]}>
+              {t('bookingVehicle')}
+            </Text>
             <View style={styles.pickValue}>
               <Text style={[styles.rowValue, { color: colors.ink }]}>
                 {booking ? vehicleLabel(booking.vehicleType, t) : t('bookingTapToSelect')}
@@ -342,8 +398,8 @@ export function FacilityDetailOverlay({
           </Pressable>
         </Card>
 
-        <Card style={styles.card}>
-          <Text style={[styles.cardTitle, { color: colors.ink }]}>{t('priceTitle')}</Text>
+        <Card style={[styles.card, styles.cardRadius]}>
+          <Text style={[styles.cardTitle, { color: colors.muted }]}>{t('priceTitle')}</Text>
           {quote ? (
             <>
               <Text style={[styles.muted, { color: colors.muted }]}>
@@ -363,7 +419,7 @@ export function FacilityDetailOverlay({
               <View style={[styles.divider, { backgroundColor: colors.line }]} />
               <View style={styles.row}>
                 <Text style={[styles.totalLabel, { color: colors.ink }]}>{t('total')}</Text>
-                <Text style={[styles.totalValue, { color: colors.pri }]}>
+                <Text style={[styles.totalValueCard, { color: colors.pri }]}>
                   {formatMoney(quote.totalCents, locale, quote.currency)}
                 </Text>
               </View>
@@ -394,7 +450,7 @@ export function FacilityDetailOverlay({
         {quote ? (
           <View style={styles.footerTotal}>
             <Text style={[styles.rowLabel, { color: colors.muted }]}>{t('total')}</Text>
-            <Text style={[styles.totalValue, { color: colors.pri }]}>
+            <Text style={[styles.totalValue, { color: colors.ink }]}>
               {formatMoney(quote.totalCents, locale, quote.currency)}
             </Text>
           </View>
@@ -424,6 +480,7 @@ const styles = StyleSheet.create({
     right: 0,
     justifyContent: 'flex-end',
     padding: spacing.md,
+    overflow: 'hidden',
   },
   heroButtonRow: {
     position: 'absolute',
@@ -442,8 +499,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   iconBackdropPressed: { opacity: 0.75 },
+  heroWatermark: {
+    position: 'absolute',
+    right: -14,
+    bottom: -14,
+    opacity: 0.22,
+  },
   heroContent: { gap: 4 },
-  heroTitle: { fontSize: typography.display.fontSize, fontWeight: '700', color: '#fff' },
+  heroTitle: { fontSize: 23, fontWeight: typography.display.fontWeight, color: '#fff' },
   heroAddress: {
     fontSize: typography.body.fontSize,
     color: 'rgba(255,255,255,0.85)',
@@ -453,12 +516,17 @@ const styles = StyleSheet.create({
   content: { padding: spacing.md, paddingTop: HERO_HEIGHT + spacing.md, paddingBottom: spacing.xl },
   pickRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    gap: spacing.md,
+    gap: spacing.sm,
+    paddingHorizontal: 13,
+    paddingVertical: 13,
+    borderWidth: 1,
+    borderRadius: 13,
+    marginBottom: 9,
   },
+  pickRowLast: { marginBottom: 0 },
   pickRowPressed: { opacity: 0.6 },
+  pickLabel: { flex: 1 },
   pickValue: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
   footer: {
     flexDirection: 'row',
@@ -474,23 +542,34 @@ const styles = StyleSheet.create({
   directions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   directionsPressed: { opacity: 0.6 },
   card: { marginTop: spacing.md },
+  cardRadius: { borderRadius: 18 },
   cardTitle: {
-    fontSize: typography.body.fontSize,
-    fontWeight: '600',
+    fontSize: typography.eyebrow.fontSize,
+    fontWeight: typography.eyebrow.fontWeight,
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
     marginBottom: spacing.sm,
   },
+  chip: {
+    paddingHorizontal: 13,
+    paddingVertical: 8,
+    borderRadius: 11,
+    borderWidth: 1,
+  },
+  chipText: { fontSize: 13, fontWeight: '600' },
   wrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   divider: { height: 1, marginVertical: spacing.sm },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6 },
-  rowLabel: { fontSize: typography.caption.fontSize, flexShrink: 1 },
+  rowLabel: { fontSize: 14, flexShrink: 1 },
   rowValue: {
-    fontSize: typography.caption.fontSize,
+    fontSize: 14,
     fontWeight: '500',
     flexShrink: 1,
     textAlign: 'right',
   },
-  totalLabel: { fontSize: typography.heading.fontSize, fontWeight: '700' },
+  totalLabel: { fontSize: 16, fontWeight: '800' },
   totalValue: { fontSize: typography.heading.fontSize, fontWeight: '700' },
+  totalValueCard: { fontSize: 20, fontWeight: '800' },
   muted: { fontSize: typography.caption.fontSize },
   policy: { fontSize: typography.caption.fontSize, marginTop: spacing.sm },
   error: {

@@ -6,11 +6,18 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview'
 
 import { PIN_ANCHOR, PIN_SIZE, pinSvgMarkup } from './logo'
 import type { MapProps } from './types'
-import { formatDistance } from '../../lib/format'
+import { useLanguage } from '../../i18n/LanguageProvider'
+import { formatDistance, formatMoney } from '../../lib/format'
+
+interface LeafletStrings {
+  detailsCta: string
+  directionsCta: string
+}
 
 function buildHtml(
   center: { lat: number; lng: number },
   colors: ThemeContextValue['colors'],
+  strings: LeafletStrings,
 ): string {
   return `<!DOCTYPE html>
 <html>
@@ -23,16 +30,21 @@ function buildHtml(
     .pin { filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); line-height: 0; }
     .leaflet-popup-content { margin: 10px 12px; }
     .leaflet-popup-content-wrapper { border-radius: 14px; cursor: pointer;
-      background: ${colors.surface}; color: ${colors.ink}; border: 1px solid ${colors.line};
+      background: ${colors.sheet}; color: ${colors.ink}; border: 1px solid ${colors.line};
       box-shadow: 0 6px 20px rgba(0,0,0,.45); }
-    .leaflet-popup-tip { background: ${colors.surface}; border: 1px solid ${colors.line}; box-shadow: none; }
+    .leaflet-popup-tip { background: ${colors.sheet}; border: 1px solid ${colors.line}; box-shadow: none; }
     .leaflet-popup-close-button { color: ${colors.muted} !important; }
     .leaflet-popup-close-button:hover { color: ${colors.ink} !important; }
-    .tip { min-width: 170px; }
-    .tip__name { font: 600 14px system-ui, sans-serif; color: ${colors.ink}; }
-    .tip__addr { font-size: 12px; color: ${colors.muted}; margin: 2px 0 6px; }
-    .tip__meta { font-size: 13px; color: ${colors.ink}; margin-bottom: 6px; }
-    .tip__actions { display: flex; align-items: center; gap: 12px; }
+    .tip { min-width: 200px; }
+    .tip__row { display: flex; align-items: flex-start; gap: 10px; }
+    .tip__info { flex: 1; min-width: 0; }
+    .tip__name { font: 700 16px system-ui, sans-serif; color: ${colors.ink}; }
+    .tip__addr { font-size: 12px; color: ${colors.muted}; margin: 2px 0 0; }
+    .tip__meta { font-size: 12px; color: ${colors.muted}; margin: 6px 0 6px; }
+    .tip__priceWrap { text-align: right; flex: none; }
+    .tip__price { font: 800 19px system-ui, sans-serif; color: ${colors.pri}; }
+    .tip__priceSub { font-size: 11px; color: ${colors.muted}; }
+    .tip__actions { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
     .tip__cta { font: 600 13px system-ui, sans-serif; color: ${colors.pri}; cursor: pointer; }
     .tip__dir { border-left: 1px solid ${colors.line}; padding-left: 12px; }
     .user-dot { width: 18px; height: 18px; border-radius: 50%; background: ${colors.pri};
@@ -115,12 +127,17 @@ function buildHtml(
     }
     function popupHtml(it) {
       return '<div class="tip">' +
-               '<div class="tip__name">' + it.name + '</div>' +
-               '<div class="tip__addr">' + it.address + '</div>' +
-               '<div class="tip__meta">' + it.meta + '</div>' +
+               '<div class="tip__row">' +
+                 '<div class="tip__info">' +
+                   '<div class="tip__name">' + it.name + '</div>' +
+                   '<div class="tip__addr">' + it.address + '</div>' +
+                   '<div class="tip__meta">' + it.meta + '</div>' +
+                 '</div>' +
+                 (it.price ? '<div class="tip__priceWrap"><div class="tip__price">' + it.price + '</div><div class="tip__priceSub">' + it.priceSub + '</div></div>' : '') +
+               '</div>' +
                '<div class="tip__actions">' +
-                 '<div class="tip__cta" onclick="window.go(\\'' + it.id + '\\')">Λεπτομέρειες →</div>' +
-                 '<div class="tip__cta tip__dir" onclick="window.dir(event, \\'' + it.id + '\\')">↗ Οδηγίες</div>' +
+                 '<div class="tip__cta" onclick="window.go(\\'' + it.id + '\\')">${strings.detailsCta} →</div>' +
+                 '<div class="tip__cta tip__dir" onclick="window.dir(event, \\'' + it.id + '\\')">↗ ${strings.directionsCta}</div>' +
                '</div>' +
              '</div>';
     }
@@ -227,11 +244,19 @@ export function LeafletMap({
   onSpotSelect,
 }: MapProps) {
   const { mode, colors } = useTheme()
+  const { t, locale } = useLanguage()
   const ref = useRef<WebView>(null)
-  // Only `mode` (not `center`) is a dep: center changes are pushed via `recenter()`
-  // post-mount, not by rebuilding the whole HTML document.
+  // Only `mode`/`locale` (not `center`) are deps: center changes are pushed via
+  // `recenter()` post-mount, not by rebuilding the whole HTML document.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const html = useMemo(() => buildHtml(center, colors), [mode])
+  const html = useMemo(
+    () =>
+      buildHtml(center, colors, {
+        detailsCta: t('mapDetailsCta'),
+        directionsCta: t('mapDirectionsCta'),
+      }),
+    [mode, locale],
+  )
 
   const payload = useMemo(
     () =>
@@ -242,9 +267,14 @@ export function LeafletMap({
         name: r.name,
         address: r.address,
         available: r.available,
-        meta: (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters),
+        meta:
+          (r.available ? t('badgeAvailable') : t('badgeFull')) +
+          ' · ' +
+          formatDistance(r.distanceMeters),
+        price: r.priceCents != null ? formatMoney(r.priceCents, locale, r.currency) : null,
+        priceSub: t('priceTotalSuffix'),
       })),
-    [results],
+    [results, locale, t],
   )
 
   const clusterPayload = useMemo(

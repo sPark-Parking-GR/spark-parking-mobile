@@ -9,12 +9,14 @@ import { formatDistance, formatMoney } from '../lib/format'
 
 function FacilityCardBase({
   result,
+  isCheapest,
   onSelect,
 }: {
   result: FacilitySearchResult
+  isCheapest?: boolean
   onSelect: (id: string) => void
 }) {
-  const { colors, radii } = useTheme()
+  const { colors } = useTheme()
   const { locale, t } = useLanguage()
   const availability = !result.available
     ? { label: t('badgeFull'), variant: 'error' as const }
@@ -30,7 +32,6 @@ function FacilityCardBase({
         {
           backgroundColor: colors.surface,
           borderColor: colors.line,
-          borderRadius: radii.md,
         },
         pressed && styles.pressed,
       ]}
@@ -40,6 +41,13 @@ function FacilityCardBase({
           <Text style={[styles.title, { color: colors.ink }]} numberOfLines={1}>
             {result.name}
           </Text>
+          {isCheapest ? (
+            <Text
+              style={[styles.cheapestTag, { color: colors.pri, backgroundColor: colors.priSoft }]}
+            >
+              {t('cheapestTag')}
+            </Text>
+          ) : null}
           {result.isPromoted ? <Badge label={t('badgePromoted')} variant="neutral" /> : null}
         </View>
         <Text style={[styles.address, { color: colors.muted }]} numberOfLines={1}>
@@ -70,6 +78,7 @@ export const FacilityCard = memo(
   FacilityCardBase,
   (a, b) =>
     a.onSelect === b.onSelect &&
+    a.isCheapest === b.isCheapest &&
     a.result.id === b.result.id &&
     a.result.name === b.result.name &&
     a.result.address === b.result.address &&
@@ -85,19 +94,28 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: spacing.md,
+    gap: 12,
     borderWidth: 1,
-    padding: spacing.md,
-    marginBottom: spacing.md,
+    borderRadius: 18,
+    padding: 14,
+    marginBottom: 10,
   },
   pressed: { opacity: 0.9, transform: [{ scale: 0.99 }] },
   left: { flex: 1, gap: 6 },
   titleRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  title: { fontSize: typography.label.fontSize, fontWeight: '600', flexShrink: 1 },
-  address: { fontSize: typography.body.fontSize },
+  title: { fontSize: typography.label.fontSize, fontWeight: '700', flexShrink: 1 },
+  cheapestTag: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 999,
+  },
+  address: { fontSize: 12 },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 2 },
   distance: { fontSize: typography.caption.fontSize },
   right: { alignItems: 'flex-end', justifyContent: 'center' },
-  price: { fontSize: typography.heading.fontSize, fontWeight: '700' },
+  price: { fontSize: typography.heading.fontSize, fontWeight: '800' },
   priceLabel: { fontSize: typography.caption.fontSize },
 })

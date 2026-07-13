@@ -12,11 +12,12 @@ import MapView, {
 
 import { MapPin, PIN_ANCHOR } from './logo'
 import type { MapProps } from './types'
+import { useLanguage } from '../../i18n/LanguageProvider'
 import type { FacilitySearchResult } from '../../lib/api'
-import { formatDistance } from '../../lib/format'
+import { formatDistance, formatMoney } from '../../lib/format'
 
-function metaLine(r: FacilitySearchResult): string {
-  return (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters)
+function metaLine(r: FacilitySearchResult, availableLabel: string, fullLabel: string): string {
+  return (r.available ? availableLabel : fullLabel) + ' · ' + formatDistance(r.distanceMeters)
 }
 
 // Dark basemap (Google, Android) tuned to the navy brand canvas.
@@ -60,6 +61,7 @@ export function NativeMap({
   onSpotSelect,
 }: MapProps) {
   const { colors } = useTheme()
+  const { t, locale } = useLanguage()
   const ref = useRef<MapView>(null)
   const markerRefs = useRef<Record<string, ElementRef<typeof Marker> | null>>({})
   const selectedId = useRef<string | null>(null)
@@ -165,17 +167,32 @@ export function NativeMap({
           <MapPin available={r.available} colors={colors} />
           <Callout tooltip>
             <View
-              style={[
-                styles.callout,
-                { backgroundColor: colors.surface, borderColor: colors.line },
-              ]}
+              style={[styles.callout, { backgroundColor: colors.sheet, borderColor: colors.line }]}
             >
-              <Text style={[styles.calloutName, { color: colors.ink }]}>{r.name}</Text>
-              <Text style={[styles.calloutAddr, { color: colors.muted }]}>{r.address}</Text>
-              <Text style={[styles.calloutMeta, { color: colors.ink }]}>{metaLine(r)}</Text>
+              <View style={styles.calloutHeader}>
+                <View style={styles.calloutInfo}>
+                  <Text style={[styles.calloutName, { color: colors.ink }]}>{r.name}</Text>
+                  <Text style={[styles.calloutAddr, { color: colors.muted }]}>{r.address}</Text>
+                  <Text style={[styles.calloutMeta, { color: colors.muted }]}>
+                    {metaLine(r, t('badgeAvailable'), t('badgeFull'))}
+                  </Text>
+                </View>
+                {r.priceCents != null ? (
+                  <View style={styles.calloutPriceWrap}>
+                    <Text style={[styles.calloutPrice, { color: colors.pri }]}>
+                      {formatMoney(r.priceCents, locale, r.currency)}
+                    </Text>
+                    <Text style={[styles.calloutPriceSub, { color: colors.muted }]}>
+                      {t('priceTotalSuffix')}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
               <View style={styles.calloutActions}>
                 <CalloutSubview style={styles.calloutBtn} onPress={() => onMarkerPress(r.id)}>
-                  <Text style={[styles.calloutCta, { color: colors.pri }]}>Λεπτομέρειες →</Text>
+                  <Text style={[styles.calloutCta, { color: colors.pri }]}>
+                    {t('mapDetailsCta')} →
+                  </Text>
                 </CalloutSubview>
                 <CalloutSubview
                   style={[
@@ -186,7 +203,9 @@ export function NativeMap({
                   onPress={() => onDirections(r.id)}
                 >
                   <Ionicons name="navigate" size={14} color={colors.pri} />
-                  <Text style={[styles.calloutCta, { color: colors.pri }]}>Οδηγίες</Text>
+                  <Text style={[styles.calloutCta, { color: colors.pri }]}>
+                    {t('mapDirectionsCta')}
+                  </Text>
                 </CalloutSubview>
               </View>
             </View>
@@ -230,8 +249,7 @@ const styles = StyleSheet.create({
   },
   clusterText: { fontSize: typography.body.fontSize, fontWeight: '700' },
   callout: {
-    minWidth: 180,
-    gap: 2,
+    minWidth: 220,
     borderWidth: 1,
     borderRadius: radii.md,
     paddingVertical: spacing.sm,
@@ -242,9 +260,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 6 },
     elevation: 6,
   },
-  calloutName: { fontSize: 14, fontWeight: '600' },
-  calloutAddr: { fontSize: typography.caption.fontSize },
-  calloutMeta: { fontSize: typography.body.fontSize, marginTop: 2 },
+  calloutHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
+  calloutInfo: { flex: 1, minWidth: 0 },
+  calloutName: { fontSize: 16, fontWeight: '700' },
+  calloutAddr: { fontSize: 12, marginTop: 2 },
+  calloutMeta: { fontSize: 12, marginTop: 6 },
+  calloutPriceWrap: { alignItems: 'flex-end' },
+  calloutPrice: { fontSize: 19, fontWeight: '800' },
+  calloutPriceSub: { fontSize: 11 },
   calloutActions: {
     flexDirection: 'row',
     alignItems: 'center',

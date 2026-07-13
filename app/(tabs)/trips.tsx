@@ -19,30 +19,27 @@ export default function TripsScreen() {
   const renderItem = ({ item }: { item: TripRecord }) => {
     const isActive = new Date(item.endsAt) > new Date()
     return (
-      <Card style={styles.card}>
+      <Card padding={16} style={styles.card}>
         <View style={styles.headerRow}>
-          <Text style={[styles.facilityName, { color: colors.ink }]} numberOfLines={1}>
-            {item.facilityName}
-          </Text>
           <Badge variant={isActive ? 'ok' : 'neutral'}>
             {isActive ? t('tripsActive') : t('tripsPast')}
           </Badge>
+          <Text style={[styles.price, { color: colors.ink }]}>
+            {formatMoney(item.totalCents, locale, item.currency)}
+          </Text>
         </View>
-        <Text style={[styles.recap, { color: colors.muted }]}>
-          {formatTimeRange(item.startsAt, item.endsAt, locale)}
+        <Text style={[styles.facilityName, { color: colors.ink }]} numberOfLines={1}>
+          {item.facilityName}
         </Text>
         <Text style={[styles.recap, { color: colors.muted }]}>
-          {vehicleLabel(item.vehicleType, t)}
+          {formatTimeRange(item.startsAt, item.endsAt, locale)} · {vehicleLabel(item.vehicleType, t)}
         </Text>
         <View style={[styles.footerRow, { borderTopColor: colors.line }]}>
-          <View>
-            <Text style={[styles.code, { color: colors.pri }]}>{item.code}</Text>
-            <Text style={[styles.price, { color: colors.ink }]}>
-              {formatMoney(item.totalCents, locale, item.currency)}
-            </Text>
-          </View>
+          <Text style={[styles.code, { color: colors.pri }]}>{item.code}</Text>
           <Pressable onPress={() => openFacilityDetail(item.facilityId)} hitSlop={8}>
-            <Text style={[styles.directions, { color: colors.pri }]}>{t('tripsDirections')}</Text>
+            <Text style={[styles.directions, { color: colors.pri }]}>
+              {t('tripsDirections')} →
+            </Text>
           </Pressable>
         </View>
       </Card>
@@ -71,32 +68,36 @@ export default function TripsScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1 },
   title: {
-    fontSize: typography.display.fontSize,
-    fontWeight: '600',
+    fontSize: 26,
+    fontWeight: '800',
     padding: spacing.md,
     paddingBottom: 0,
   },
-  list: { padding: spacing.md, gap: spacing.md },
-  card: { marginBottom: spacing.md },
+  list: { padding: spacing.md, gap: 12 },
+  card: { borderRadius: 18 },
   headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    gap: spacing.sm,
+    gap: 9,
   },
-  facilityName: { fontSize: typography.heading.fontSize, fontWeight: '600', flexShrink: 1 },
-  recap: { fontSize: typography.body.fontSize, marginTop: 4 },
+  facilityName: {
+    fontSize: 16,
+    fontWeight: typography.heading.fontWeight,
+    marginTop: 6,
+  },
+  recap: { fontSize: 12, marginTop: 4 },
   footerRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginTop: spacing.sm,
-    paddingTop: spacing.sm,
+    paddingTop: 12,
     borderTopWidth: 1,
   },
   code: { fontSize: typography.caption.fontSize, fontWeight: '700', letterSpacing: 1 },
-  price: { fontSize: typography.body.fontSize, fontWeight: '600' },
-  directions: { fontSize: typography.label.fontSize, fontWeight: '600' },
+  price: { fontSize: 16, fontWeight: '800' },
+  directions: { fontSize: 13, fontWeight: '700' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   emptyText: { fontSize: 15, textAlign: 'center' },
 })

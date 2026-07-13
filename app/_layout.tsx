@@ -1,18 +1,22 @@
-import { useTheme } from '@spark/ui'
+import { colors, useTheme } from '@spark/ui'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import type { ReactElement } from 'react'
 import { useEffect, useState } from 'react'
-import { View } from 'react-native'
+import { useColorScheme, View } from 'react-native'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { LanguageProvider } from '../src/i18n/LanguageProvider'
 import { ONBOARDED_STORAGE_KEY } from '../src/lib/constants'
 import { OverlayProvider } from '../src/navigation/OverlayContext'
-import { colors as staticColors } from '../src/theme'
 import { AppThemeProvider } from '../src/theme/AppThemeProvider'
+
+function ThemedStatusBar(): ReactElement {
+  const { mode } = useTheme()
+  return <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />
+}
 
 function RootNavigator({ onboarded }: { onboarded: boolean }): ReactElement {
   const { colors } = useTheme()
@@ -37,6 +41,7 @@ function RootNavigator({ onboarded }: { onboarded: boolean }): ReactElement {
 
 export default function RootLayout() {
   const [onboarded, setOnboarded] = useState<boolean | null>(null)
+  const systemScheme = useColorScheme()
 
   useEffect(() => {
     let cancelled = false
@@ -49,7 +54,8 @@ export default function RootLayout() {
   }, [])
 
   if (onboarded === null) {
-    return <View style={{ flex: 1, backgroundColor: staticColors.bg }} />
+    const bg = systemScheme === 'light' ? colors.light.bg : colors.dark.bg
+    return <View style={{ flex: 1, backgroundColor: bg }} />
   }
 
   return (
@@ -57,7 +63,7 @@ export default function RootLayout() {
       <AppThemeProvider>
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
-            <StatusBar style="light" />
+            <ThemedStatusBar />
             <OverlayProvider>
               <RootNavigator onboarded={onboarded} />
             </OverlayProvider>

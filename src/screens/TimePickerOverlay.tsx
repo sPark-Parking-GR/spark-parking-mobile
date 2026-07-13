@@ -1,6 +1,5 @@
-import { typography, useTheme } from '@spark/ui'
 import { useEffect, useState } from 'react'
-import { BackHandler, StyleSheet, Text } from 'react-native'
+import { BackHandler } from 'react-native'
 
 import { BookingForm, type BookingValue } from '../components/BookingForm'
 import { Button } from '../components/ui'
@@ -16,7 +15,6 @@ export function TimePickerOverlay({
 }) {
   const { closeOverlay } = useOverlay()
   const { t } = useLanguage()
-  const { colors } = useTheme()
   const [draft, setDraft] = useState<BookingValue>(initial)
 
   useEffect(() => {
@@ -29,7 +27,6 @@ export function TimePickerOverlay({
 
   return (
     <>
-      <Text style={[styles.title, { color: colors.ink }]}>{t('bookingDuration')}</Text>
       <BookingForm initial={initial} onChange={setDraft} />
       <Button
         label={t('bookingApply')}
@@ -42,7 +39,3 @@ export function TimePickerOverlay({
     </>
   )
 }
-
-const styles = StyleSheet.create({
-  title: { fontSize: typography.heading.fontSize, fontWeight: '700' },
-})

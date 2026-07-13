@@ -3,6 +3,7 @@ import { useTheme } from '@spark/ui'
 import { Tabs } from 'expo-router'
 import { useRef } from 'react'
 import { StyleSheet, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { Sheet } from '../../src/components/Sheet'
 import { useLanguage } from '../../src/i18n/LanguageProvider'
@@ -17,6 +18,7 @@ export default function TabsLayout() {
   const { colors } = useTheme()
   const { t } = useLanguage()
   const { overlay, closeOverlay } = useOverlay()
+  const insets = useSafeAreaInsets()
 
   // Latch the params of the sheet-style overlays so their content stays rendered
   // through the Sheet's exit animation after `overlay` clears.
@@ -31,7 +33,18 @@ export default function TabsLayout() {
           headerShown: false,
           tabBarActiveTintColor: colors.pri,
           tabBarInactiveTintColor: colors.faint,
-          tabBarStyle: overlay ? styles.hidden : undefined,
+          tabBarLabelStyle: styles.tabLabel,
+          tabBarStyle: overlay
+            ? styles.hidden
+            : [
+                styles.tabBar,
+                {
+                  backgroundColor: colors.tabbar,
+                  borderTopColor: colors.line,
+                  height: 58 + insets.bottom,
+                  paddingBottom: insets.bottom + 12,
+                },
+              ],
         }}
       >
         <Tabs.Screen
@@ -123,4 +136,18 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   hidden: { display: 'none' },
   overlay: { position: 'absolute', inset: 0, zIndex: 100 },
+  tabBar: {
+    borderTopWidth: 1,
+    paddingTop: 9,
+    paddingHorizontal: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.18,
+    shadowRadius: 24,
+    elevation: 12,
+  },
+  tabLabel: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
 })

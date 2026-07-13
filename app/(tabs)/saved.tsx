@@ -4,8 +4,10 @@ import { useFocusEffect } from 'expo-router'
 import { useCallback } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
 import { Card } from '../../src/components/ui'
+import { LogoMark } from '../../src/components/map/logo'
 import { useLanguage } from '../../src/i18n/LanguageProvider'
 import { useSavedFacilities, type SavedFacility } from '../../src/lib/savedFacilities'
 import { useOverlay } from '../../src/navigation/OverlayContext'
@@ -24,12 +26,26 @@ function SavedFacilityRow({
       style={({ pressed }) => pressed && styles.rowPressed}
     >
       <Card style={styles.card}>
-        <Text style={[styles.name, { color: colors.ink }]} numberOfLines={1}>
-          {facility.name}
-        </Text>
-        <Text style={[styles.address, { color: colors.muted }]} numberOfLines={1}>
-          {facility.address}
-        </Text>
+        <View style={styles.avatar}>
+          <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+            <Defs>
+              <LinearGradient id="savedAvatarGrad" x1="0" y1="0" x2="1" y2="1">
+                <Stop offset="0" stopColor={colors.pri} />
+                <Stop offset="1" stopColor={colors.pri2} />
+              </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#savedAvatarGrad)" />
+          </Svg>
+          <LogoMark size={22} color="#fff" />
+        </View>
+        <View style={styles.rowText}>
+          <Text style={[styles.name, { color: colors.ink }]} numberOfLines={1}>
+            {facility.name}
+          </Text>
+          <Text style={[styles.address, { color: colors.muted }]} numberOfLines={1}>
+            {facility.address}
+          </Text>
+        </View>
       </Card>
     </Pressable>
   )
@@ -53,7 +69,12 @@ export default function SavedScreen() {
       <Text style={[styles.title, { color: colors.ink }]}>{t('savedTitle')}</Text>
       {saved.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons name="star-outline" size={40} color={colors.faint} />
+          <Ionicons
+            name="star-outline"
+            size={40}
+            color={colors.faint}
+            style={styles.emptyIcon}
+          />
           <Text style={[styles.emptyText, { color: colors.faint }]}>{t('savedEmpty')}</Text>
         </View>
       ) : (
@@ -70,19 +91,44 @@ export default function SavedScreen() {
   )
 }
 
+const AVATAR_SIZE = 44
+
 const styles = StyleSheet.create({
   root: { flex: 1 },
   title: {
-    fontSize: typography.heading.fontSize,
-    fontWeight: '700',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
+    fontSize: 26,
+    fontWeight: '800',
+    paddingHorizontal: 20,
+    paddingTop: spacing.sm,
+    paddingBottom: 14,
   },
-  listContent: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl },
-  card: { marginBottom: spacing.md },
-  name: { fontSize: typography.label.fontSize, fontWeight: '600' },
-  address: { fontSize: typography.body.fontSize, marginTop: 2 },
+  listContent: { paddingHorizontal: 18, paddingTop: spacing.xs, paddingBottom: spacing.xl },
+  card: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: 14,
+    borderRadius: 18,
+    marginBottom: 10,
+  },
+  avatar: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: 12,
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowText: { flex: 1, minWidth: 0 },
+  name: { fontSize: typography.label.fontSize, fontWeight: typography.label.fontWeight },
+  address: { fontSize: 12, fontWeight: '400', marginTop: 2 },
   rowPressed: { opacity: 0.85 },
-  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm, padding: 24 },
-  emptyText: { fontSize: 15, textAlign: 'center' },
+  empty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+  },
+  emptyIcon: { marginBottom: 14 },
+  emptyText: { fontSize: 15, lineHeight: 22, textAlign: 'center' },
 })

@@ -56,13 +56,15 @@ export function ReviewOverlay({
     })
   }
 
+  const confirmLabel = `${t('reviewConfirm')} · ${formatMoney(quote.totalCents, locale, quote.currency)}`
+
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
       <Pressable
         onPress={back}
         style={({ pressed }) => [
           styles.close,
-          { top: insets.top + spacing.sm, backgroundColor: colors.surface },
+          { top: insets.top + spacing.sm, backgroundColor: colors.sheet },
           pressed && styles.closePressed,
         ]}
         hitSlop={12}
@@ -78,12 +80,10 @@ export function ReviewOverlay({
       >
         <Text style={[styles.title, { color: colors.ink }]}>{t('reviewTitle')}</Text>
 
-        <Card style={styles.card}>
+        <Card style={[styles.card, styles.cardRadius]}>
           <Text style={[styles.facilityName, { color: colors.ink }]}>{facilityName}</Text>
           <Text style={[styles.muted, { color: colors.muted }]}>{facilityAddress}</Text>
-        </Card>
-
-        <Card style={styles.card}>
+          <View style={[styles.divider, { marginVertical: 14, backgroundColor: colors.line }]} />
           <View style={styles.row}>
             <Text style={[styles.rowLabel, { color: colors.muted }]}>{t('bookingDuration')}</Text>
             <Text style={[styles.rowValue, { color: colors.ink }]}>
@@ -98,13 +98,14 @@ export function ReviewOverlay({
           </View>
         </Card>
 
-        <Card style={styles.card}>
-          <Text style={[styles.cardTitle, { color: colors.ink }]}>{t('reviewPaymentMethod')}</Text>
+        <Card style={[styles.card, styles.cardRadius]}>
+          <Text style={[styles.cardTitle, { color: colors.muted }]}>
+            {t('reviewPaymentMethod')}
+          </Text>
           <Text style={[styles.muted, { color: colors.muted }]}>{t('reviewNoPaymentMethod')}</Text>
         </Card>
 
-        <Card style={styles.card}>
-          <Text style={[styles.cardTitle, { color: colors.ink }]}>{t('reviewPriceBreakdown')}</Text>
+        <Card style={[styles.card, styles.cardRadius]}>
           {quote.lineItems.map((item, i) => (
             <View key={i} style={styles.row}>
               <Text style={[styles.rowLabel, { color: colors.muted }]}>
@@ -118,7 +119,7 @@ export function ReviewOverlay({
           <View style={[styles.divider, { backgroundColor: colors.line }]} />
           <View style={styles.row}>
             <Text style={[styles.totalLabel, { color: colors.ink }]}>{t('reviewTotal')}</Text>
-            <Text style={[styles.totalValue, { color: colors.pri }]}>
+            <Text style={[styles.totalValueCard, { color: colors.pri }]}>
               {formatMoney(quote.totalCents, locale, quote.currency)}
             </Text>
           </View>
@@ -130,20 +131,12 @@ export function ReviewOverlay({
           styles.footer,
           {
             paddingBottom: insets.bottom + spacing.md,
-            backgroundColor: colors.surface,
+            backgroundColor: colors.sheet,
             borderTopColor: colors.line,
           },
         ]}
       >
-        <View style={styles.footerTotal}>
-          <Text style={[styles.rowLabel, { color: colors.muted }]}>{t('reviewTotal')}</Text>
-          <Text style={[styles.totalValue, { color: colors.pri }]}>
-            {formatMoney(quote.totalCents, locale, quote.currency)}
-          </Text>
-        </View>
-        <View style={styles.footerBtn}>
-          <Button label={t('reviewConfirm')} icon="checkmark-circle" onPress={confirm} />
-        </View>
+        <Button label={confirmLabel} onPress={confirm} />
       </View>
     </View>
   )
@@ -168,34 +161,32 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   closePressed: { opacity: 0.85 },
-  title: { fontSize: typography.display.fontSize, fontWeight: '600' },
-  card: { marginTop: spacing.md },
+  title: { fontSize: 20, fontWeight: '800' },
+  card: { marginTop: 14 },
+  cardRadius: { borderRadius: 18 },
   cardTitle: {
-    fontSize: typography.body.fontSize,
-    fontWeight: '600',
+    fontSize: typography.eyebrow.fontSize,
+    fontWeight: typography.eyebrow.fontWeight,
+    textTransform: 'uppercase',
+    letterSpacing: 1.1,
     marginBottom: spacing.sm,
   },
-  facilityName: { fontSize: typography.heading.fontSize, fontWeight: '600' },
+  facilityName: { fontSize: 17, fontWeight: typography.heading.fontWeight },
   divider: { height: 1, marginVertical: spacing.sm },
   row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 6, gap: spacing.md },
   rowLabel: { fontSize: typography.body.fontSize, flexShrink: 1 },
   rowValue: {
     fontSize: typography.body.fontSize,
-    fontWeight: '500',
+    fontWeight: typography.label.fontWeight,
     flexShrink: 1,
     textAlign: 'right',
   },
-  totalLabel: { fontSize: typography.heading.fontSize, fontWeight: '700' },
-  totalValue: { fontSize: typography.heading.fontSize, fontWeight: '700' },
-  muted: { fontSize: typography.body.fontSize, marginTop: 2 },
+  totalLabel: { fontSize: 16, fontWeight: '800' },
+  totalValueCard: { fontSize: 20, fontWeight: '800' },
+  muted: { fontSize: 12, marginTop: 2 },
   footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
     borderTopWidth: 1,
   },
-  footerTotal: { flexShrink: 1 },
-  footerBtn: { flex: 1 },
 })

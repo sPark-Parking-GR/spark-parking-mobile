@@ -39,6 +39,8 @@ export function BottomSheet({
   onSortNearby,
   onSortCost,
   costLabel,
+  cheapestId,
+  onExpandedChange,
 }: {
   results: FacilitySearchResult[]
   // The map is showing aggregated clusters (zoomed out), so the list is empty by
@@ -55,6 +57,11 @@ export function BottomSheet({
   onSortCost: () => void
   // Active cost window summary, shown under the chips while sorting by cost.
   costLabel?: string | null
+  // Id of the currently-cheapest priced result in the list, tagged in its row.
+  cheapestId?: string | null
+  // Fires when the sheet settles above/at its peek detent, so the map's floating
+  // controls can move clear of the sheet instead of sitting under it.
+  onExpandedChange?: (expanded: boolean) => void
 }) {
   const { colors } = useTheme()
   const { t } = useLanguage()
@@ -84,7 +91,14 @@ export function BottomSheet({
   // translationY at the moment the handoff engaged, so the sheet doesn't jump.
   const handoff = useSharedValue(0)
 
-  const setExpandedJS = useCallback((y: number) => setExpanded(y <= halfY + 1), [halfY])
+  const setExpandedJS = useCallback(
+    (y: number) => {
+      const next = y <= halfY + 1
+      setExpanded(next)
+      onExpandedChange?.(next)
+    },
+    [halfY, onExpandedChange],
+  )
 
   // Resting detents, open (top) → closed (bottom).
   const snapTo = (startY: number, curY: number, velocityY: number) => {
@@ -188,8 +202,10 @@ export function BottomSheet({
 
   const keyExtractor = useCallback((item: FacilitySearchResult) => item.id, [])
   const renderItem = useCallback<ListRenderItem<FacilitySearchResult>>(
-    ({ item }) => <FacilityCard result={item} onSelect={onSelect} />,
-    [onSelect],
+    ({ item }) => (
+      <FacilityCard result={item} isCheapest={item.id === cheapestId} onSelect={onSelect} />
+    ),
+    [onSelect, cheapestId],
   )
   const skeletonStyle = [styles.skeleton, { borderRadius: radii.md, backgroundColor: colors.card2 }]
   const emptyStyle = [styles.empty, { color: colors.muted }]
@@ -215,11 +231,11 @@ export function BottomSheet({
 
   return (
     <Animated.View
-      style={[styles.sheet, { height: fullH, backgroundColor: colors.surface }, sheetStyle]}
+      style={[styles.sheet, { height: fullH, backgroundColor: colors.sheet }, sheetStyle]}
     >
       <GestureDetector gesture={pan}>
         <View style={styles.header}>
-          <View style={[styles.grip, { backgroundColor: colors.line }]} />
+          <View style={[styles.grip, { backgroundColor: colors.muted }]} />
           <View style={styles.titleRow}>
             <Text
               style={[styles.title, { fontSize: typography.label.fontSize, color: colors.ink }]}
@@ -301,19 +317,20 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    borderTopLeftRadius: radii.lg,
-    borderTopRightRadius: radii.lg,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: -4 },
-    elevation: 12,
+    shadowOpacity: 0.22,
+    shadowRadius: 44,
+    shadowOffset: { width: 0, height: -16 },
+    elevation: 16,
   },
   header: { paddingTop: spacing.sm, paddingBottom: spacing.sm },
   grip: {
     width: 40,
-    height: 4,
-    borderRadius: 999,
+    height: 5,
+    borderRadius: 3,
+    opacity: 0.4,
     alignSelf: 'center',
     marginBottom: 10,
   },

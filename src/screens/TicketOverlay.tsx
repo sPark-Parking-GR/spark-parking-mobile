@@ -4,9 +4,10 @@ import { router } from 'expo-router'
 import { useEffect } from 'react'
 import { BackHandler, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
 import type { BookingValue } from '../components/BookingForm'
-import { Button } from '../components/ui'
+import { Button, Card } from '../components/ui'
 import { useLanguage } from '../i18n/LanguageProvider'
 import { vehicleLabel } from '../lib/constants'
 import { formatTimeRange } from '../lib/format'
@@ -25,7 +26,7 @@ export function TicketOverlay({
 }) {
   const { closeOverlay } = useOverlay()
   const { t, locale } = useLanguage()
-  const { colors, radii } = useTheme()
+  const { colors } = useTheme()
   const insets = useSafeAreaInsets()
 
   const backToMap = () => closeOverlay()
@@ -44,77 +45,111 @@ export function TicketOverlay({
   }, [])
 
   return (
-    <View
-      style={[
-        styles.root,
-        {
-          paddingTop: insets.top + spacing.xl,
-          paddingBottom: insets.bottom + spacing.md,
-          backgroundColor: colors.bg,
-        },
-      ]}
-    >
-      <View style={styles.body}>
-        <View style={[styles.check, { backgroundColor: colors.ok }]}>
+    <View style={[styles.root, { backgroundColor: colors.sheet }]}>
+      <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]}>
+        <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="ticketHeroGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={colors.pri} />
+              <Stop offset="1" stopColor={colors.pri2} />
+            </LinearGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#ticketHeroGrad)" />
+        </Svg>
+        <View style={styles.check}>
           <Ionicons name="checkmark" size={40} color="#fff" />
         </View>
-        <Text style={[styles.title, { color: colors.ink }]}>{t('ticketConfirmed')}</Text>
-        <Text style={[styles.facilityName, { color: colors.muted }]}>{facilityName}</Text>
-
-        <View
-          style={[
-            styles.qrBox,
-            { borderRadius: radii.md, borderColor: colors.line, backgroundColor: colors.surface },
-          ]}
-        >
-          <Ionicons name="qr-code-outline" size={48} color={colors.muted} />
-          <Text style={[styles.qrNote, { color: colors.muted }]}>{t('ticketQrComingSoon')}</Text>
-        </View>
-
-        <Text style={[styles.codeLabel, { color: colors.muted }]}>{t('ticketCode')}</Text>
-        <Text style={[styles.code, { color: colors.pri }]}>{code}</Text>
-
-        <Text style={[styles.recap, { color: colors.muted }]}>
-          {formatTimeRange(booking.startsAt, booking.endsAt, locale)}
-        </Text>
-        <Text style={[styles.recap, { color: colors.muted }]}>
-          {vehicleLabel(booking.vehicleType, t)}
-        </Text>
+        <Text style={styles.title}>{t('ticketConfirmed')}</Text>
+        <Text style={styles.subtitle}>{t('ticketConfirmSubtitle')}</Text>
       </View>
 
-      <View style={styles.actions}>
-        <Button label={t('ticketViewTrips')} icon="receipt-outline" onPress={viewTrips} />
-        <Button label={t('ticketBackToMap')} variant="secondary" onPress={backToMap} />
+      <View
+        style={[
+          styles.sheet,
+          { backgroundColor: colors.sheet, paddingBottom: insets.bottom + spacing.md },
+        ]}
+      >
+        <Card style={styles.ticketCard}>
+          <View style={[styles.qrBox, { borderColor: colors.line, backgroundColor: colors.card2 }]}>
+            <Ionicons name="qr-code-outline" size={28} color={colors.muted} />
+          </View>
+          <View style={styles.ticketInfo}>
+            <Text style={[styles.codeLabel, { color: colors.muted }]}>{t('ticketCode')}</Text>
+            <Text style={[styles.code, { color: colors.ink }]}>{code}</Text>
+            <Text style={[styles.facilityName, { color: colors.ink }]} numberOfLines={1}>
+              {facilityName}
+            </Text>
+            <Text style={[styles.recap, { color: colors.muted }]} numberOfLines={1}>
+              {formatTimeRange(booking.startsAt, booking.endsAt, locale)} ·{' '}
+              {vehicleLabel(booking.vehicleType, t)}
+            </Text>
+          </View>
+        </Card>
+        <Text style={[styles.qrNote, { color: colors.muted }]}>{t('ticketQrComingSoon')}</Text>
+
+        <View style={styles.actions}>
+          <Button label={t('ticketViewTrips')} onPress={viewTrips} />
+          <Button label={t('ticketBackToMap')} variant="secondary" onPress={backToMap} />
+        </View>
       </View>
     </View>
   )
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, paddingHorizontal: spacing.lg },
-  body: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.sm },
-  check: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+  root: { flex: 1 },
+  hero: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    overflow: 'hidden',
   },
-  title: { fontSize: typography.display.fontSize, fontWeight: '700' },
-  facilityName: { fontSize: typography.body.fontSize },
+  check: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
+  title: { fontSize: 26, fontWeight: '800', color: '#fff' },
+  subtitle: {
+    fontSize: 15,
+    lineHeight: 22,
+    color: 'rgba(255,255,255,0.85)',
+    textAlign: 'center',
+    maxWidth: 280,
+    marginTop: 8,
+  },
+  sheet: {
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    paddingHorizontal: 22,
+    paddingTop: 26,
+    gap: spacing.sm,
+  },
+  ticketCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    padding: 18,
+    borderRadius: 18,
+  },
   qrBox: {
-    width: 180,
-    height: 180,
+    width: 76,
+    height: 76,
+    borderRadius: 12,
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    marginVertical: spacing.md,
   },
-  qrNote: { fontSize: typography.caption.fontSize },
-  codeLabel: { fontSize: typography.body.fontSize },
-  code: { fontSize: typography.heading.fontSize, fontWeight: '700', letterSpacing: 1 },
-  recap: { fontSize: typography.body.fontSize },
-  actions: { gap: spacing.sm },
+  ticketInfo: { flex: 1, minWidth: 0 },
+  qrNote: { fontSize: typography.caption.fontSize, textAlign: 'center' },
+  facilityName: { fontSize: typography.body.fontSize, fontWeight: '600', marginTop: 4 },
+  codeLabel: { fontSize: typography.caption.fontSize },
+  code: { fontSize: 20, fontWeight: '800', letterSpacing: 1.2 },
+  recap: { fontSize: typography.caption.fontSize, marginTop: 2 },
+  actions: { gap: spacing.sm, marginTop: spacing.sm },
 })

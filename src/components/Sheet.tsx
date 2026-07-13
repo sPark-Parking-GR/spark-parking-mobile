@@ -25,7 +25,7 @@ export function Sheet({
   onClose: () => void
   children: ReactNode
 }) {
-  const { colors, radii } = useTheme()
+  const { colors } = useTheme()
   const { height } = useWindowDimensions()
   const [mounted, setMounted] = useState(open)
   const ty = useSharedValue(height)
@@ -74,22 +74,14 @@ export function Sheet({
         <Animated.View style={[styles.backdrop, { backgroundColor: colors.scrim }, backdropStyle]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
           <Animated.View
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: colors.surface,
-                borderTopLeftRadius: radii.lg,
-                borderTopRightRadius: radii.lg,
-              },
-              sheetStyle,
-            ]}
+            style={[styles.sheet, { backgroundColor: colors.sheet }, sheetStyle]}
             onLayout={(e) => {
               sheetH.value = e.nativeEvent.layout.height
             }}
           >
             <GestureDetector gesture={pan}>
               <View style={styles.handle}>
-                <View style={[styles.grip, { backgroundColor: colors.line }]} />
+                <View style={[styles.grip, { backgroundColor: colors.muted, opacity: 0.4 }]} />
               </View>
             </GestureDetector>
             {children}
@@ -104,19 +96,22 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   backdrop: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingHorizontal: 20,
+    paddingTop: 12,
+    paddingBottom: 30,
     gap: spacing.md,
+    borderTopLeftRadius: 26,
+    borderTopRightRadius: 26,
     shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 24,
-    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 50,
+    shadowOffset: { width: 0, height: -20 },
     elevation: 12,
   },
-  handle: { paddingTop: spacing.sm, paddingBottom: spacing.xs, alignItems: 'center' },
+  handle: { paddingBottom: spacing.xs, alignItems: 'center' },
   grip: {
     width: 40,
-    height: 4,
+    height: 5,
     borderRadius: 999,
   },
 })

@@ -1,8 +1,9 @@
-import { MaterialIcons } from '@expo/vector-icons'
+import { Ionicons, MaterialIcons } from '@expo/vector-icons'
 import { computeDistanceMeters, generalizedCostCents } from '@spark/maps'
-import { useTheme } from '@spark/ui'
+import { spacing, useTheme } from '@spark/ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, StyleSheet, View } from 'react-native'
+import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { defaultEnd, defaultStart, type BookingValue } from '../../src/components/BookingForm'
 import { BottomSheet, type SortMode } from '../../src/components/BottomSheet'
@@ -20,7 +21,6 @@ import { formatDateTimeShort } from '../../src/lib/format'
 import { useUserLocation } from '../../src/lib/location'
 import { useDebouncedCallback } from '../../src/lib/useDebouncedCallback'
 import { useOverlay } from '../../src/navigation/OverlayContext'
-import { space } from '../../src/theme'
 
 const MIN_RADIUS = 300
 const MAX_RADIUS = 50_000
@@ -29,6 +29,8 @@ const FIT_NEAREST = 3
 // Over-fetch this fraction beyond the viewport on each side, so small pans stay
 // inside the already-fetched area and need no new request.
 const FETCH_PADDING = 0.5
+const PEEK_FAB_BOTTOM = 148
+const TOP_ROW_HEIGHT = 50
 
 function contains(outer: MapBounds, inner: MapBounds): boolean {
   return (
@@ -76,6 +78,8 @@ export default function MapScreen() {
   const { t, locale } = useLanguage()
   const { coords, status, retry } = useUserLocation()
   const { openFacilityDetail, openTimePicker, openFilters } = useOverlay()
+  const insets = useSafeAreaInsets()
+  const { height: screenH } = useWindowDimensions()
 
   const [applied, setApplied] = useState<BookingValue>(defaultWindow)
   const [sortMode, setSortMode] = useState<SortMode>('nearby')
@@ -91,9 +95,13 @@ export default function MapScreen() {
   const [collapseNonce, setCollapseNonce] = useState(0)
   const [visibleBounds, setVisibleBounds] = useState<MapBounds | null>(null)
   const [atUser, setAtUser] = useState(false)
+  const [sheetExpanded, setSheetExpanded] = useState(false)
   const autoLocated = useRef(false)
   // The padded bounds the current results cover; pans inside it skip refetching.
   const lastFetched = useRef<MapBounds | null>(null)
+  // Mirrors the sheet's own half-detent math so the recenter FAB floats just above
+  // it instead of the sheet sliding over a control fixed at the peek offset.
+  const fabBottom = sheetExpanded ? Math.round(screenH * 0.5) + 14 : PEEK_FAB_BOTTOM
 
   function recenterTo(c: { lat: number; lng: number }) {
     setCenter(c)
@@ -221,6 +229,17 @@ export default function MapScreen() {
     return sorted
   }, [mapResults, visibleBounds, sortMode])
 
+  // The lowest-priced listed spot gets the "cheapest" tag — real priced data only,
+  // never guessed when every visible spot is unpriced.
+  const cheapestId = useMemo(() => {
+    let best: FacilitySearchResult | null = null
+    for (const r of listResults) {
+      if (r.priceCents == null) continue
+      if (!best || r.priceCents < best.priceCents!) best = r
+    }
+    return best?.id ?? null
+  }, [listResults])
+
   const costLabel = useMemo(() => {
     if (sortMode !== 'cost') return null
     const vehicle = vehicleLabel(applied.vehicleType, t)
@@ -295,29 +314,42 @@ export default function MapScreen() {
         />
       </View>
 
-      <Pressable
-        onPress={openFilters}
-        style={({ pressed }) => [
-          styles.fab,
-          styles.fabFilters,
-          { backgroundColor: colors.surface },
-          pressed && styles.fabPressed,
-        ]}
-      >
-        <MaterialIcons name="tune" size={22} color={colors.pri} />
-      </Pressable>
+      <View style={[styles.topRow, { top: insets.top + spacing.sm }]}>
+        <View
+          style={[
+            styles.searchPill,
+            { backgroundColor: colors.sheet, borderColor: colors.line },
+          ]}
+        >
+          <Ionicons name="search" size={17} color={colors.muted} />
+          <Text style={[styles.searchHint, { color: colors.muted }]} numberOfLines={1}>
+            {t('searchHint')}
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={openFilters}
+          style={({ pressed }) => [
+            styles.squareFab,
+            { backgroundColor: colors.sheet, borderColor: colors.line },
+            pressed && styles.fabPressed,
+          ]}
+        >
+          <MaterialIcons name="tune" size={19} color={colors.ink} />
+        </Pressable>
+      </View>
 
       <Pressable
         onPress={locateMe}
         style={({ pressed }) => [
-          styles.fab,
-          { backgroundColor: colors.surface },
+          styles.recenterFab,
+          { bottom: fabBottom, backgroundColor: colors.sheet, borderColor: colors.line },
           pressed && styles.fabPressed,
         ]}
       >
         <MaterialIcons
           name={status === 'denied' ? 'gps-off' : atUser ? 'gps-fixed' : 'gps-not-fixed'}
-          size={22}
+          size={20}
           color={colors.pri}
         />
       </Pressable>
@@ -333,6 +365,8 @@ export default function MapScreen() {
         onSortNearby={() => setSortMode('nearby')}
         onSortCost={openCostPicker}
         costLabel={costLabel}
+        cheapestId={cheapestId}
+        onExpandedChange={setSheetExpanded}
       />
     </View>
   )
@@ -340,13 +374,49 @@ export default function MapScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  fab: {
+  topRow: {
     position: 'absolute',
-    right: space.md,
-    bottom: 148,
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    left: 16,
+    right: 16,
+    flexDirection: 'row',
+    gap: 10,
+  },
+  searchPill: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    height: TOP_ROW_HEIGHT,
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 15,
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  searchHint: { fontSize: 14, fontWeight: '500' },
+  squareFab: {
+    width: TOP_ROW_HEIGHT,
+    height: TOP_ROW_HEIGHT,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 4,
+  },
+  recenterFab: {
+    position: 'absolute',
+    right: spacing.md,
+    width: 46,
+    height: 46,
+    borderRadius: 14,
+    borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
@@ -355,6 +425,5 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 6,
   },
-  fabFilters: { bottom: 148 + 48 + space.sm },
   fabPressed: { opacity: 0.85 },
 })

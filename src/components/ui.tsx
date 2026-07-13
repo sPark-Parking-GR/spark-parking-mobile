@@ -10,9 +10,13 @@ import {
   View,
   type TextInputProps,
 } from 'react-native'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
+
+const BTN_RADIUS = 15
+const GLOW_COLOR = '#249ED9'
 
 export function Card({ children, style }: { children: ReactNode; style?: object }) {
-  const { colors, radii } = useTheme()
+  const { colors, radii, mode } = useTheme()
   return (
     <View
       style={[
@@ -22,6 +26,7 @@ export function Card({ children, style }: { children: ReactNode; style?: object 
           borderColor: colors.line,
           borderRadius: radii.md,
         },
+        mode === 'light' && styles.cardShadow,
         style,
       ]}
     >
@@ -45,29 +50,48 @@ export function Button({
   loading?: boolean
   icon?: keyof typeof Ionicons.glyphMap
 }) {
-  const { colors, radii } = useTheme()
+  const { colors } = useTheme()
   const isSecondary = variant === 'secondary'
-  const fg = isSecondary ? colors.pri : '#fff'
+  const fg = isSecondary ? colors.ink : '#fff'
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.btn,
-        { borderRadius: radii.md },
         isSecondary
-          ? { backgroundColor: 'transparent', borderColor: colors.pri }
-          : { backgroundColor: colors.pri, borderColor: colors.pri },
+          ? { backgroundColor: 'transparent', borderColor: colors.line }
+          : { borderColor: 'transparent', overflow: 'hidden' },
+        !isSecondary && !disabled && !loading && styles.btnGlow,
         pressed && !disabled && styles.btnPressed,
         (disabled || loading) && styles.btnDisabled,
       ]}
     >
+      {!isSecondary && (
+        <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+          <Defs>
+            <LinearGradient id="btnGrad" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={colors.pri} />
+              <Stop offset="1" stopColor={colors.pri2} />
+            </LinearGradient>
+          </Defs>
+          <Rect width="100%" height="100%" fill="url(#btnGrad)" />
+        </Svg>
+      )}
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
         <>
           {icon ? <Ionicons name={icon} size={18} color={fg} /> : null}
-          <Text style={[styles.btnText, { fontSize: typography.label.fontSize, color: fg }]}>
+          <Text
+            style={[
+              styles.btnText,
+              isSecondary
+                ? { fontSize: typography.label.fontSize, fontWeight: typography.label.fontWeight }
+                : { fontSize: 16, fontWeight: '800' },
+              { color: fg },
+            ]}
+          >
             {label}
           </Text>
         </>
@@ -88,9 +112,7 @@ export function Badge({ label, variant = 'neutral' }: { label: string; variant?:
   }[variant]
   return (
     <View style={[styles.badge, { backgroundColor: map.bg }]}>
-      <Text style={[styles.badgeText, { fontSize: typography.caption.fontSize, color: map.fg }]}>
-        {label}
-      </Text>
+      <Text style={[styles.badgeText, { color: map.fg }]}>{label}</Text>
     </View>
   )
 }
@@ -127,6 +149,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: spacing.md,
   },
+  cardShadow: {
+    shadowColor: '#0C1B2A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 2,
+  },
   btn: {
     minHeight: 48,
     flexDirection: 'row',
@@ -135,12 +164,20 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 20,
     borderWidth: 1,
+    borderRadius: BTN_RADIUS,
+  },
+  btnGlow: {
+    shadowColor: GLOW_COLOR,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 26,
+    elevation: 8,
   },
   btnPressed: { opacity: 0.85 },
   btnDisabled: { opacity: 0.5 },
-  btnText: { fontWeight: '600' },
+  btnText: {},
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
-  badgeText: { fontWeight: '600' },
+  badgeText: { fontSize: 11, fontWeight: '800' },
   field: { marginBottom: spacing.md },
   fieldLabel: {
     fontWeight: '500',

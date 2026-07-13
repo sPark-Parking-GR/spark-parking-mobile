@@ -2,7 +2,7 @@ import { spacing, typography, useTheme } from '@spark/ui'
 import { useEffect } from 'react'
 import { BackHandler, StyleSheet, Text, View } from 'react-native'
 
-import { Badge, Button } from '../components/ui'
+import { Button } from '../components/ui'
 import { useLanguage } from '../i18n/LanguageProvider'
 import { useOverlay } from '../navigation/OverlayContext'
 
@@ -16,7 +16,7 @@ const AMENITY_KEYS = [
 export function FiltersOverlay() {
   const { closeOverlay } = useOverlay()
   const { t } = useLanguage()
-  const { colors } = useTheme()
+  const { colors, radii } = useTheme()
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
@@ -30,30 +30,32 @@ export function FiltersOverlay() {
     <>
       <Text style={[styles.title, { color: colors.ink }]}>{t('filtersTitle')}</Text>
       <Text style={[styles.note, { color: colors.muted }]}>{t('filtersComingSoon')}</Text>
+      <Text style={[styles.eyebrow, { color: colors.muted }]}>{t('filtersAmenities')}</Text>
       <View style={styles.chips}>
         {AMENITY_KEYS.map((key) => (
-          <View key={key} style={styles.chipMuted}>
-            <Badge label={t(key)} variant="neutral" />
+          <View
+            key={key}
+            style={[styles.chip, { borderColor: colors.line, borderRadius: radii.md }]}
+          >
+            <Text style={[styles.chipText, { color: colors.ink }]}>{t(key)}</Text>
           </View>
         ))}
       </View>
-      <View style={styles.actions}>
-        <View style={styles.action}>
-          <Button label={t('filtersReset')} variant="secondary" onPress={closeOverlay} />
-        </View>
-        <View style={styles.action}>
-          <Button label={t('bookingApply')} onPress={closeOverlay} />
-        </View>
-      </View>
+      <Button label={t('bookingApply')} onPress={closeOverlay} />
     </>
   )
 }
 
 const styles = StyleSheet.create({
-  title: { fontSize: typography.heading.fontSize, fontWeight: '700' },
+  title: { fontSize: typography.heading.fontSize, fontWeight: typography.heading.fontWeight },
   note: { fontSize: typography.body.fontSize, marginTop: -spacing.sm },
-  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  chipMuted: { opacity: 0.4 },
-  actions: { flexDirection: 'row', gap: spacing.sm },
-  action: { flex: 1 },
+  eyebrow: {
+    fontSize: typography.eyebrow.fontSize,
+    fontWeight: typography.eyebrow.fontWeight,
+    letterSpacing: 1.1,
+    textTransform: 'uppercase',
+  },
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 9, opacity: 0.4 },
+  chip: { paddingVertical: 10, paddingHorizontal: 15, borderWidth: 1 },
+  chipText: { fontSize: typography.body.fontSize, fontWeight: '700' },
 })
