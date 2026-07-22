@@ -1,6 +1,7 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons'
 import { computeDistanceMeters, generalizedCostCents } from '@spark/maps'
 import { spacing, useTheme } from '@spark/ui'
+import { useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -15,17 +16,18 @@ import {
   type FacilityCluster,
   type FacilitySearchResult,
 } from '../../src/lib/api'
-import { FALLBACK_CENTER, vehicleLabel } from '../../src/lib/constants'
+import { FALLBACK_CENTER, tabBarFloatOffset, vehicleLabel } from '../../src/lib/constants'
 import { openDirections } from '../../src/lib/directions'
 import { formatDateTimeShort } from '../../src/lib/format'
 import { useUserLocation } from '../../src/lib/location'
 import { useDebouncedCallback } from '../../src/lib/useDebouncedCallback'
 import { useOverlay } from '../../src/navigation/OverlayContext'
+import { useSheetExpandProgress } from '../../src/navigation/SheetExpandContext'
 
 const MIN_RADIUS = 300
 const MAX_RADIUS = 50_000
 // How many of the closest parkings to frame alongside the user on first load.
-const FIT_NEAREST = 3
+const FIT_NEAREST = 4
 // Over-fetch this fraction beyond the viewport on each side, so small pans stay
 // inside the already-fetched area and need no new request.
 const FETCH_PADDING = 0.5
@@ -80,6 +82,8 @@ export default function MapScreen() {
   const { openFacilityDetail, openTimePicker, openFilters } = useOverlay()
   const insets = useSafeAreaInsets()
   const { height: screenH } = useWindowDimensions()
+  const barOffset = tabBarFloatOffset(insets.bottom)
+  const sheetProgress = useSheetExpandProgress()
 
   const [applied, setApplied] = useState<BookingValue>(defaultWindow)
   const [sortMode, setSortMode] = useState<SortMode>('nearby')
@@ -101,12 +105,21 @@ export default function MapScreen() {
   const lastFetched = useRef<MapBounds | null>(null)
   // Mirrors the sheet's own half-detent math so the recenter FAB floats just above
   // it instead of the sheet sliding over a control fixed at the peek offset.
-  const fabBottom = sheetExpanded ? Math.round(screenH * 0.5) + 14 : PEEK_FAB_BOTTOM
+  const fabBottom = (sheetExpanded ? Math.round(screenH * 0.5) + 14 : PEEK_FAB_BOTTOM) + barOffset
 
   function recenterTo(c: { lat: number; lng: number }) {
     setCenter(c)
     setCenterNonce((n) => n + 1)
   }
+
+  // Collapse the sheet back to peek when leaving this tab, so the tab bar's
+  // label/shrink state (driven by the sheet's own progress) always resets too
+  // instead of staying expanded-looking on tabs that have no sheet at all.
+  useFocusEffect(
+    useCallback(() => {
+      return () => setCollapseNonce((n) => n + 1)
+    }, []),
+  )
 
   // Recenter on the user's first GPS fix.
   useEffect(() => {
@@ -367,6 +380,8 @@ export default function MapScreen() {
         costLabel={costLabel}
         cheapestId={cheapestId}
         onExpandedChange={setSheetExpanded}
+        bottomInset={barOffset}
+        expandProgress={sheetProgress}
       />
     </View>
   )

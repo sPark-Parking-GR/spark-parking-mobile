@@ -7,11 +7,14 @@ import Animated, {
   interpolate,
   runOnJS,
   scrollTo,
+  useAnimatedReaction,
   useAnimatedRef,
   useAnimatedScrollHandler,
   useAnimatedStyle,
+  useDerivedValue,
   useSharedValue,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated'
 
 import { FacilityCard } from './FacilityCard'
@@ -21,7 +24,9 @@ import type { FacilitySearchResult } from '../lib/api'
 
 export type SortMode = 'nearby' | 'cost'
 
-const PEEK = 132
+// Header content (grip + title row) needs about this much room above the
+// floating tab bar's top edge for the collapsed sheet to clear it with a gap.
+const PEEK_HEADER_ROOM = 88
 const TAP_THRESHOLD = 8
 // A flick faster than this commits one detent in the swipe direction, even on a
 // short drag — so a deliberate swipe deploys/collapses instead of snapping back.
@@ -41,6 +46,8 @@ export function BottomSheet({
   costLabel,
   cheapestId,
   onExpandedChange,
+  bottomInset,
+  expandProgress,
 }: {
   results: FacilitySearchResult[]
   // The map is showing aggregated clusters (zoomed out), so the list is empty by
@@ -62,6 +69,11 @@ export function BottomSheet({
   // Fires when the sheet settles above/at its peek detent, so the map's floating
   // controls can move clear of the sheet instead of sitting under it.
   onExpandedChange?: (expanded: boolean) => void
+  // Extra bottom padding for the list so its last item can scroll clear of the
+  // floating tab bar instead of staying hidden behind it.
+  bottomInset: number
+  // Shared with the tab bar so its labels hide in lockstep as this sheet expands.
+  expandProgress?: SharedValue<number>
 }) {
   const { colors } = useTheme()
   const { t } = useLanguage()
@@ -72,15 +84,32 @@ export function BottomSheet({
   const { height: screenH } = useWindowDimensions()
   const fullH = Math.round(screenH * 0.85)
   const halfH = Math.round(screenH * 0.5)
+  // Clears the floating tab bar's full footprint (height + gap + safe-area inset)
+  // plus room for the header, so the collapsed sheet sits above it, not behind it.
+  const peek = bottomInset + PEEK_HEADER_ROOM
 
   // translateY: 0 = full open; larger = more closed
   const openY = 0
   const halfY = fullH - halfH
-  const peekY = fullH - PEEK
+  const peekY = fullH - peek
 
   const ty = useSharedValue(peekY)
   const start = useSharedValue(peekY)
   const [expanded, setExpanded] = useState(false)
+  const headerH = useSharedValue(0)
+
+  // 0 at peek → 1 from half-open upward. Drives the sort row + list clip below,
+  // and (via expandProgress) the tab bar's label collapse in lockstep.
+  const progress = useDerivedValue(() =>
+    interpolate(ty.value, [halfY, peekY], [1, 0], Extrapolation.CLAMP),
+  )
+
+  useAnimatedReaction(
+    () => progress.value,
+    (current, previous) => {
+      if (expandProgress && current !== previous) expandProgress.value = current
+    },
+  )
 
   // List scroll state, plus the handoff bookkeeping for delegating edge scroll.
   const scrollRef = useAnimatedRef<Animated.FlatList<FacilitySearchResult>>()
@@ -190,15 +219,11 @@ export function BottomSheet({
 
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: ty.value }] }))
 
-  // Reveal the sort row by clipping its measured height in step with the sheet:
-  // full height once lifted off the peek detent, zero when collapsed — so list
-  // items sit directly under the header instead of an empty gap. Height-only (no
-  // opacity) keeps the active segment's elevation shadow from flickering.
-  const sortContentH = useSharedValue(0)
-  const sortStyle = useAnimatedStyle(() => {
-    const p = interpolate(ty.value, [halfY, peekY], [1, 0], Extrapolation.CLAMP)
-    return { height: sortContentH.value * p }
-  })
+  // Clips the sort row + list together so, at the peek detent, only the header
+  // (count + swipe hint) is visible — no partial list content peeking through.
+  const bodyClipStyle = useAnimatedStyle(() => ({
+    height: (fullH - headerH.value) * progress.value,
+  }))
 
   const keyExtractor = useCallback((item: FacilitySearchResult) => item.id, [])
   const renderItem = useCallback<ListRenderItem<FacilitySearchResult>>(
@@ -234,7 +259,12 @@ export function BottomSheet({
       style={[styles.sheet, { height: fullH, backgroundColor: colors.sheet }, sheetStyle]}
     >
       <GestureDetector gesture={pan}>
-        <View style={styles.header}>
+        <View
+          style={styles.header}
+          onLayout={(e) => {
+            headerH.value = e.nativeEvent.layout.height
+          }}
+        >
           <View style={[styles.grip, { backgroundColor: colors.muted }]} />
           <View style={styles.titleRow}>
             <Text
@@ -256,17 +286,9 @@ export function BottomSheet({
         </View>
       </GestureDetector>
 
-      {!error && (
-        <Animated.View
-          style={[styles.sortClip, sortStyle]}
-          pointerEvents={expanded ? 'auto' : 'none'}
-        >
-          <View
-            style={styles.sortRow}
-            onLayout={(e) => {
-              sortContentH.value = e.nativeEvent.layout.height
-            }}
-          >
+      <Animated.View style={[styles.contentClip, bodyClipStyle]}>
+        {!error && (
+          <View style={styles.sortRow}>
             <SegmentedControl
               segments={sortSegments}
               value={sortMode}
@@ -284,29 +306,32 @@ export function BottomSheet({
               </Text>
             ) : null}
           </View>
-        </Animated.View>
-      )}
+        )}
 
-      <GestureDetector gesture={Gesture.Simultaneous(listPan, listScroll)}>
-        <Animated.FlatList
-          ref={scrollRef}
-          style={styles.body}
-          contentContainerStyle={styles.bodyContent}
-          data={results}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          ListEmptyComponent={listEmpty}
-          scrollEnabled={expanded}
-          showsVerticalScrollIndicator={expanded}
-          onScroll={onScroll}
-          scrollEventThrottle={16}
-          bounces={false}
-          removeClippedSubviews
-          initialNumToRender={8}
-          maxToRenderPerBatch={8}
-          windowSize={7}
-        />
-      </GestureDetector>
+        <GestureDetector gesture={Gesture.Simultaneous(listPan, listScroll)}>
+          <Animated.FlatList
+            ref={scrollRef}
+            style={styles.body}
+            contentContainerStyle={[
+              styles.bodyContent,
+              { paddingBottom: spacing.md + bottomInset },
+            ]}
+            data={results}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            ListEmptyComponent={listEmpty}
+            scrollEnabled={expanded}
+            showsVerticalScrollIndicator={expanded}
+            onScroll={onScroll}
+            scrollEventThrottle={16}
+            bounces={false}
+            removeClippedSubviews
+            initialNumToRender={8}
+            maxToRenderPerBatch={8}
+            windowSize={7}
+          />
+        </GestureDetector>
+      </Animated.View>
     </Animated.View>
   )
 }
@@ -342,7 +367,7 @@ const styles = StyleSheet.create({
   },
   title: { fontWeight: '700', flexShrink: 1 },
   hint: { fontWeight: '600' },
-  sortClip: { overflow: 'hidden' },
+  contentClip: { overflow: 'hidden' },
   sortRow: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: 6 },
   sortCaption: { fontWeight: '600', paddingHorizontal: 2 },
   body: { flex: 1 },

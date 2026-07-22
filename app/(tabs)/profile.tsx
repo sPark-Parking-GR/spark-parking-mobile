@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import type { Locale } from '../../src/i18n/messages'
 import { useLanguage } from '../../src/i18n/LanguageProvider'
+import { tabBarFloatOffset } from '../../src/lib/constants'
 
 const LANGUAGE_OPTIONS: { value: Locale; label: string }[] = [
   { value: 'en', label: 'EN' },
@@ -16,6 +17,7 @@ export default function ProfileScreen() {
   const { colors, mode, setOverride } = useTheme()
   const { locale, setLocale, t } = useLanguage()
   const insets = useSafeAreaInsets()
+  const barOffset = tabBarFloatOffset(insets.bottom)
 
   const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
     { value: 'dark', label: t('themeDark') },
@@ -25,7 +27,10 @@ export default function ProfileScreen() {
   return (
     <ScrollView
       style={[styles.root, { backgroundColor: colors.bg }]}
-      contentContainerStyle={[styles.content, { paddingTop: insets.top + spacing.lg }]}
+      contentContainerStyle={[
+        styles.content,
+        { paddingTop: insets.top + spacing.lg, paddingBottom: spacing.md + barOffset },
+      ]}
     >
       <View style={styles.header}>
         <View style={[styles.avatar, { backgroundColor: colors.card2 }]}>
@@ -79,7 +84,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  content: { padding: spacing.md, paddingBottom: 100 },
+  content: { padding: spacing.md },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

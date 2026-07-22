@@ -3,7 +3,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useLanguage } from '../../src/i18n/LanguageProvider'
-import { vehicleLabel } from '../../src/lib/constants'
+import { tabBarFloatOffset, vehicleLabel } from '../../src/lib/constants'
 import { formatMoney, formatTimeRange } from '../../src/lib/format'
 import type { TripRecord } from '../../src/lib/trips'
 import { useOverlay } from '../../src/navigation/OverlayContext'
@@ -13,6 +13,7 @@ export default function TripsScreen() {
   const { t, locale } = useLanguage()
   const { trips, openFacilityDetail } = useOverlay()
   const insets = useSafeAreaInsets()
+  const barOffset = tabBarFloatOffset(insets.bottom)
 
   const sorted = [...trips].sort((a, b) => b.confirmedAt.localeCompare(a.confirmedAt))
 
@@ -58,7 +59,7 @@ export default function TripsScreen() {
           data={sorted}
           keyExtractor={(item) => `${item.code}-${item.confirmedAt}`}
           renderItem={renderItem}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[styles.list, { paddingBottom: spacing.md + barOffset }]}
         />
       )}
     </View>

@@ -9,6 +9,7 @@ import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 import { Card } from '../../src/components/ui'
 import { LogoMark } from '../../src/components/map/logo'
 import { useLanguage } from '../../src/i18n/LanguageProvider'
+import { tabBarFloatOffset } from '../../src/lib/constants'
 import { useSavedFacilities, type SavedFacility } from '../../src/lib/savedFacilities'
 import { useOverlay } from '../../src/navigation/OverlayContext'
 
@@ -57,6 +58,7 @@ export default function SavedScreen() {
   const insets = useSafeAreaInsets()
   const { saved, reload } = useSavedFacilities()
   const { openFacilityDetail } = useOverlay()
+  const barOffset = tabBarFloatOffset(insets.bottom)
 
   useFocusEffect(
     useCallback(() => {
@@ -84,7 +86,7 @@ export default function SavedScreen() {
           renderItem={({ item }) => (
             <SavedFacilityRow facility={item} onPress={openFacilityDetail} />
           )}
-          contentContainerStyle={styles.listContent}
+          contentContainerStyle={[styles.listContent, { paddingBottom: spacing.xl + barOffset }]}
         />
       )}
     </View>

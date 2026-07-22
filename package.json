@@ -22,6 +22,7 @@
     "@spark/ui": "workspace:*",
     "babel-preset-expo": "~54.0.11",
     "expo": "~54.0.35",
+    "expo-blur": "~15.0.8",
     "expo-constants": "~18.0.13",
     "expo-dev-client": "~6.0.21",
     "expo-linking": "~8.0.12",
@@ -44,6 +45,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@react-navigation/bottom-tabs": "^7.18.2",
     "@spark/config": "workspace:*",
     "@types/react": "19.1.17",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
