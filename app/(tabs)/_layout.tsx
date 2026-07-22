@@ -38,7 +38,7 @@ function AnimatedTabIcon({ scale, children }: { scale: SharedValue<number>; chil
 // Single-line height of styles.tabLabel (fontSize 10, bold) plus the gap above
 // it — fixed rather than measured via onLayout, since a Text inside a parent
 // already animated to height:0 can never report a real size to measure from.
-const TAB_LABEL_HEIGHT = 14
+const TAB_LABEL_HEIGHT = 16
 const TAB_LABEL_GAP = 3
 
 // Collapses to icon-only as the map's bottom sheet expands (progress 0 → 1).
@@ -221,7 +221,7 @@ export default function TabsLayout() {
             options={{
               title: t('navSaved'),
               tabBarIcon: ({ focused, color, size }) => (
-                <Ionicons name={focused ? 'bookmark' : 'bookmark-outline'} color={color} size={size} />
+                <Ionicons name={focused ? 'star' : 'star-outline'} color={color} size={size} />
               ),
             }}
           />
@@ -302,20 +302,21 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     overflow: 'hidden',
     backgroundColor: 'transparent',
-    paddingTop: spacing.xs, //9,
-    paddingBottom: spacing.sm, //9,
-    paddingHorizontal: spacing.md, //14,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
+    paddingHorizontal: spacing.md,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.18,
     shadowRadius: 24,
     elevation: 12,
   },
-  tabBarRow: { flex: 1, flexDirection: 'row' },
-  buttonInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  tabBarRow: { flex: 1, flexDirection: 'row', },
+  buttonInner: { flex: 1, alignItems: 'center', justifyContent: 'center',},
   tabLabel: {
     fontSize: 10,
     fontWeight: '700',
+    lineHeight: 16,
   },
   labelWrap: { overflow: 'hidden' },
 })

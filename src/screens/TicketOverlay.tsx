@@ -46,16 +46,7 @@ export function TicketOverlay({
 
   return (
     <View style={[styles.root, { backgroundColor: colors.sheet }]}>
-      <View style={[styles.hero, { paddingTop: insets.top + spacing.xl }]}>
-        <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="ticketHeroGrad" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={colors.pri} />
-              <Stop offset="1" stopColor={colors.pri2} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#ticketHeroGrad)" />
-        </Svg>
+      <View style={[styles.hero, { paddingTop: insets.top + spacing.xl, backgroundColor: colors.pri }]}>
         <View style={styles.check}>
           <Ionicons name="checkmark" size={40} color="#fff" />
         </View>
