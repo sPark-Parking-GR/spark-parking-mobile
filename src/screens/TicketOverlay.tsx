@@ -3,6 +3,14 @@ import { spacing, typography, useTheme } from '@spark/ui'
 import { router } from 'expo-router'
 import { useEffect } from 'react'
 import { BackHandler, StyleSheet, Text, View } from 'react-native'
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
@@ -12,6 +20,30 @@ import { useLanguage } from '../i18n/LanguageProvider'
 import { vehicleLabel } from '../lib/constants'
 import { formatTimeRange } from '../lib/format'
 import { useOverlay } from '../navigation/OverlayContext'
+
+function PulseRing({ delay }: { delay: number }) {
+  const scale = useSharedValue(1)
+  const opacity = useSharedValue(0.6)
+
+  useEffect(() => {
+    scale.value = withDelay(
+      delay,
+      withRepeat(withTiming(1.8, { duration: 1600, easing: Easing.out(Easing.quad) }), -1),
+    )
+    opacity.value = withDelay(
+      delay,
+      withRepeat(withTiming(0, { duration: 1600, easing: Easing.out(Easing.quad) }), -1),
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const style = useAnimatedStyle(() => ({
+    transform: [{ scale: scale.value }],
+    opacity: opacity.value,
+  }))
+
+  return <Animated.View style={[styles.pulseRing, style]} />
+}
 
 export function TicketOverlay({
   facilityName,
@@ -47,8 +79,12 @@ export function TicketOverlay({
   return (
     <View style={[styles.root, { backgroundColor: colors.sheet }]}>
       <View style={[styles.hero, { paddingTop: insets.top + spacing.xl, backgroundColor: colors.pri }]}>
-        <View style={styles.check}>
-          <Ionicons name="checkmark" size={40} color="#fff" />
+        <View style={styles.checkWrap}>
+          <PulseRing delay={0} />
+          <PulseRing delay={800} />
+          <View style={styles.check}>
+            <Ionicons name="checkmark" size={40} color="#fff" />
+          </View>
         </View>
         <Text style={styles.title}>{t('ticketConfirmed')}</Text>
         <Text style={styles.subtitle}>{t('ticketConfirmSubtitle')}</Text>
@@ -96,6 +132,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     overflow: 'hidden',
   },
+  checkWrap: {
+    width: 88,
+    height: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 24,
+  },
   check: {
     width: 88,
     height: 88,
@@ -103,7 +146,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.18)',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 24,
+  },
+  pulseRing: {
+    position: 'absolute',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   title: { fontSize: 26, fontWeight: '800', color: '#fff' },
   subtitle: {
