@@ -14,17 +14,17 @@ const AMENITY_KEYS = [
 ] as const
 
 export function FiltersOverlay() {
-  const { closeOverlay } = useOverlay()
+  const { closeSheet } = useOverlay()
   const { t } = useLanguage()
   const { colors, radii } = useTheme()
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      closeOverlay()
+      closeSheet()
       return true
     })
     return () => sub.remove()
-  }, [closeOverlay])
+  }, [closeSheet])
 
   return (
     <>
@@ -41,7 +41,7 @@ export function FiltersOverlay() {
           </View>
         ))}
       </View>
-      <Button label={t('bookingApply')} onPress={closeOverlay} />
+      <Button label={t('bookingApply')} onPress={closeSheet} />
     </>
   )
 }

@@ -1,5 +1,5 @@
-import { colors, useTheme } from '@spark/ui'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { colors, useTheme } from '@spark/ui'
 import { Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import type { ReactElement } from 'react'
@@ -10,6 +10,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context'
 
 import { LanguageProvider } from '../src/i18n/LanguageProvider'
 import { ONBOARDED_STORAGE_KEY } from '../src/lib/constants'
+import { SavedFacilitiesProvider } from '../src/lib/savedFacilities'
 import { OverlayProvider } from '../src/navigation/OverlayContext'
 import { AppThemeProvider } from '../src/theme/AppThemeProvider'
 
@@ -64,9 +65,11 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
             <ThemedStatusBar />
-            <OverlayProvider>
-              <RootNavigator onboarded={onboarded} />
-            </OverlayProvider>
+            <SavedFacilitiesProvider>
+              <OverlayProvider>
+                <RootNavigator onboarded={onboarded} />
+              </OverlayProvider>
+            </SavedFacilitiesProvider>
           </SafeAreaProvider>
         </GestureHandlerRootView>
       </AppThemeProvider>

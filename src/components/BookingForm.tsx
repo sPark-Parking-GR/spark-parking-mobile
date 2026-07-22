@@ -3,9 +3,7 @@ import { spacing, typography, useTheme } from '@spark/ui'
 import { useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
-import { SegmentedControl, type Segment } from './SegmentedControl'
 import { useLanguage } from '../i18n/LanguageProvider'
-import { VEHICLE_TYPES } from '../lib/constants'
 
 export interface BookingValue {
   startsAt: string
@@ -25,13 +23,6 @@ const DURATION_PRESETS = [
   { minutes: 240, labelKey: 'duration4h' },
   { minutes: 1440, labelKey: 'durationAllDay' },
 ] as const
-
-const VEHICLE_ICONS: Record<string, Segment['icon']> = {
-  CAR: 'car',
-  MOTORCYCLE: 'motorbike',
-  VAN: 'van-passenger',
-  TRUCK: 'truck',
-}
 
 // The next closest full hour — the earliest selectable arrival.
 export function defaultStart(): Date {
@@ -73,20 +64,10 @@ export function BookingForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [start, initial?.endsAt])
 
-  const [vehicleType, setVehicleType] = useState(initial?.vehicleType ?? 'CAR')
+  const vehicleType = initial?.vehicleType ?? 'CAR'
   const [minutes, setMinutes] = useState(seedMinutes)
   const [customOpen, setCustomOpen] = useState(
     () => !DURATION_PRESETS.some((preset) => preset.minutes === seedMinutes),
-  )
-
-  const vehicleSegments = useMemo<Segment[]>(
-    () =>
-      VEHICLE_TYPES.map((vt) => ({
-        value: vt.value,
-        label: t(vt.labelKey),
-        icon: VEHICLE_ICONS[vt.value] ?? 'car',
-      })),
-    [t],
   )
 
   useEffect(() => {
@@ -164,11 +145,6 @@ export function BookingForm({
           />
         </View>
       )}
-
-      <Text style={[styles.eyebrow, { color: colors.muted, marginTop: spacing.sm }]}>
-        {t('bookingVehicle')}
-      </Text>
-      <SegmentedControl segments={vehicleSegments} value={vehicleType} onChange={setVehicleType} />
     </View>
   )
 }

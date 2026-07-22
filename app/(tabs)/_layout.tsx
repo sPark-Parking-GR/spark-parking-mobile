@@ -84,7 +84,7 @@ function CustomTabBar({
 }: BottomTabBarProps & { scaleByRoute: Record<string, SharedValue<number>> }) {
   const { colors, mode } = useTheme()
   const insets = useSafeAreaInsets()
-  const { overlay } = useOverlay()
+  const { overlay, sheet } = useOverlay()
   const progress = useSheetExpandProgress()
 
   const animatedStyle = useAnimatedStyle(() => ({
@@ -103,7 +103,7 @@ function CustomTabBar({
           right: spacing.md,
           bottom: insets.bottom + TAB_BAR_GAP,
           borderColor: colors.line,
-          display: overlay ? 'none' : 'flex',
+          display: overlay || sheet ? 'none' : 'flex',
         },
         animatedStyle,
       ]}
@@ -175,7 +175,7 @@ function CustomTabBar({
 
 export default function TabsLayout() {
   const { t } = useLanguage()
-  const { overlay, closeOverlay } = useOverlay()
+  const { overlay, sheet, closeSheet } = useOverlay()
 
   // One press-scale value per tab, shared between that tab's button (sets it
   // on press) and its icon (reads it).
@@ -195,9 +195,9 @@ export default function TabsLayout() {
   const sheetProgress = useSharedValue(0)
 
   // Latch the params of the sheet-style overlays so their content stays rendered
-  // through the Sheet's exit animation after `overlay` clears.
-  const lastTimePicker = useRef<Extract<typeof overlay, { type: 'timePicker' }> | null>(null)
-  if (overlay?.type === 'timePicker') lastTimePicker.current = overlay
+  // through the Sheet's exit animation after `sheet` clears.
+  const lastTimePicker = useRef<Extract<typeof sheet, { type: 'timePicker' }> | null>(null)
+  if (sheet?.type === 'timePicker') lastTimePicker.current = sheet
   const timePicker = lastTimePicker.current
 
   return (
@@ -275,13 +275,13 @@ export default function TabsLayout() {
           </View>
         )}
 
-        <Sheet open={overlay?.type === 'timePicker'} onClose={closeOverlay}>
+        <Sheet open={sheet?.type === 'timePicker'} onClose={closeSheet}>
           {timePicker ? (
             <TimePickerOverlay initial={timePicker.initial} onApply={timePicker.onApply} />
           ) : null}
         </Sheet>
 
-        <Sheet open={overlay?.type === 'filters'} onClose={closeOverlay}>
+        <Sheet open={sheet?.type === 'filters'} onClose={closeSheet}>
           <FiltersOverlay />
         </Sheet>
       </View>

@@ -13,17 +13,17 @@ export function TimePickerOverlay({
   initial: BookingValue
   onApply: (next: BookingValue) => void
 }) {
-  const { closeOverlay } = useOverlay()
+  const { closeSheet } = useOverlay()
   const { t } = useLanguage()
   const [draft, setDraft] = useState<BookingValue>(initial)
 
   useEffect(() => {
     const sub = BackHandler.addEventListener('hardwareBackPress', () => {
-      closeOverlay()
+      closeSheet()
       return true
     })
     return () => sub.remove()
-  }, [closeOverlay])
+  }, [closeSheet])
 
   return (
     <>
@@ -33,7 +33,7 @@ export function TimePickerOverlay({
         icon="checkmark"
         onPress={() => {
           onApply(draft)
-          closeOverlay()
+          closeSheet()
         }}
       />
     </>

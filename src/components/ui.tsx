@@ -10,6 +10,13 @@ import {
   View,
   type TextInputProps,
 } from 'react-native'
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
 const BTN_RADIUS = 15
@@ -42,6 +49,8 @@ export function Button({
   disabled,
   loading,
   icon,
+  iconPosition = 'leading',
+  animateIcon,
 }: {
   label: string
   onPress: () => void
@@ -49,13 +58,36 @@ export function Button({
   disabled?: boolean
   loading?: boolean
   icon?: keyof typeof Ionicons.glyphMap
+  iconPosition?: 'leading' | 'trailing'
+  animateIcon?: boolean
 }) {
   const { colors } = useTheme()
   const isSecondary = variant === 'secondary'
   const fg = isSecondary ? colors.ink : '#fff'
+  const iconOffset = useSharedValue(0)
+  const iconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: iconOffset.value }],
+  }))
+
+  const handlePress = () => {
+    if (animateIcon) {
+      iconOffset.value = withSequence(
+        withTiming(6, { duration: 140, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { duration: 180, easing: Easing.inOut(Easing.quad) }),
+      )
+    }
+    onPress()
+  }
+
+  const iconEl = icon ? (
+    <Animated.View style={animateIcon ? iconAnimatedStyle : undefined}>
+      <Ionicons name={icon} size={18} color={fg} />
+    </Animated.View>
+  ) : null
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.btn,
@@ -82,7 +114,7 @@ export function Button({
         <ActivityIndicator color={fg} />
       ) : (
         <>
-          {icon ? <Ionicons name={icon} size={18} color={fg} /> : null}
+          {iconPosition === 'leading' ? iconEl : null}
           <Text
             style={[
               styles.btnText,
@@ -94,6 +126,7 @@ export function Button({
           >
             {label}
           </Text>
+          {iconPosition === 'trailing' ? iconEl : null}
         </>
       )}
     </Pressable>

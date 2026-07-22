@@ -1,5 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useCallback, useEffect, useState } from 'react'
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactElement,
+  type ReactNode,
+} from 'react'
 
 const SAVED_FACILITIES_STORAGE_KEY = 'spark-saved-facilities'
 
@@ -19,14 +28,19 @@ async function readSaved(): Promise<SavedFacility[]> {
   }
 }
 
-export interface UseSavedFacilitiesResult {
+export interface SavedFacilitiesContextValue {
   saved: SavedFacility[]
   isSaved: (id: string) => boolean
   toggleSaved: (facility: SavedFacility) => void
   reload: () => void
 }
 
-export function useSavedFacilities(): UseSavedFacilitiesResult {
+const SavedFacilitiesContext = createContext<SavedFacilitiesContextValue | null>(null)
+
+// One shared instance of the saved list, provided once at the app root — every
+// screen that reads or toggles it (Saved tab, facility detail star) sees the
+// same live state instead of its own disconnected snapshot.
+export function SavedFacilitiesProvider({ children }: { children: ReactNode }): ReactElement {
   const [saved, setSaved] = useState<SavedFacility[]>([])
 
   useEffect(() => {
@@ -55,5 +69,18 @@ export function useSavedFacilities(): UseSavedFacilitiesResult {
 
   const isSaved = useCallback((id: string) => saved.some((f) => f.id === id), [saved])
 
-  return { saved, isSaved, toggleSaved, reload }
+  const value = useMemo<SavedFacilitiesContextValue>(
+    () => ({ saved, isSaved, toggleSaved, reload }),
+    [saved, isSaved, toggleSaved, reload],
+  )
+
+  return <SavedFacilitiesContext.Provider value={value}>{children}</SavedFacilitiesContext.Provider>
+}
+
+export function useSavedFacilities(): SavedFacilitiesContextValue {
+  const ctx = useContext(SavedFacilitiesContext)
+  if (!ctx) {
+    throw new Error('useSavedFacilities must be used within a SavedFacilitiesProvider')
+  }
+  return ctx
 }

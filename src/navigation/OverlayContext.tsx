@@ -7,8 +7,6 @@ import { useTrips, type TripRecord } from '../lib/trips'
 
 export type OverlayState =
   | { type: 'facilityDetail'; facilityId: string; booking?: BookingValue }
-  | { type: 'timePicker'; initial: BookingValue; onApply: (next: BookingValue) => void }
-  | { type: 'filters' }
   | {
       type: 'review'
       facilityId: string
@@ -28,8 +26,18 @@ export type OverlayState =
     }
   | null
 
+// Bottom-sheet overlays live in their own slot, independent of `overlay` — they
+// layer on top of whatever's currently showing (a base overlay or a tab screen)
+// rather than replacing it. Sharing one slot used to mean opening the time/vehicle
+// sheet from the facility detail screen unmounted it, exposing the map underneath.
+export type SheetState =
+  | { type: 'timePicker'; initial: BookingValue; onApply: (next: BookingValue) => void }
+  | { type: 'filters' }
+  | null
+
 export interface OverlayContextValue {
   overlay: OverlayState
+  sheet: SheetState
   trips: TripRecord[]
   openFacilityDetail: (facilityId: string, booking?: BookingValue) => void
   openTimePicker: (initial: BookingValue, onApply: (next: BookingValue) => void) => void
@@ -50,12 +58,14 @@ export interface OverlayContextValue {
     currency: string
   }) => void
   closeOverlay: () => void
+  closeSheet: () => void
 }
 
 const OverlayContext = createContext<OverlayContextValue | null>(null)
 
 export function OverlayProvider({ children }: { children: ReactNode }): ReactElement {
   const [overlay, setOverlay] = useState<OverlayState>(null)
+  const [sheet, setSheet] = useState<SheetState>(null)
   const { trips, addTrip } = useTrips()
 
   const openFacilityDetail = useCallback((facilityId: string, booking?: BookingValue) => {
@@ -64,13 +74,13 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
 
   const openTimePicker = useCallback(
     (initial: BookingValue, onApply: (next: BookingValue) => void) => {
-      setOverlay({ type: 'timePicker', initial, onApply })
+      setSheet({ type: 'timePicker', initial, onApply })
     },
     [],
   )
 
   const openFilters = useCallback(() => {
-    setOverlay({ type: 'filters' })
+    setSheet({ type: 'filters' })
   }, [])
 
   const openReview = useCallback(
@@ -116,9 +126,14 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
     setOverlay(null)
   }, [])
 
+  const closeSheet = useCallback(() => {
+    setSheet(null)
+  }, [])
+
   const value = useMemo<OverlayContextValue>(
     () => ({
       overlay,
+      sheet,
       trips,
       openFacilityDetail,
       openTimePicker,
@@ -126,9 +141,11 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       openReview,
       openTicket,
       closeOverlay,
+      closeSheet,
     }),
     [
       overlay,
+      sheet,
       trips,
       openFacilityDetail,
       openTimePicker,
@@ -136,6 +153,7 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       openReview,
       openTicket,
       closeOverlay,
+      closeSheet,
     ],
   )
 

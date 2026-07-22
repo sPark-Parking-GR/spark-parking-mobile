@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
 import { computeDistanceMeters } from '@spark/maps'
 import { spacing, typography, useTheme } from '@spark/ui'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   BackHandler,
@@ -12,15 +12,15 @@ import {
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
 import { defaultEnd, defaultStart, type BookingValue } from '../components/BookingForm'
+import { SegmentedControl, type Segment } from '../components/SegmentedControl'
 import { LogoMark } from '../components/map/logo'
 import { Button, Card } from '../components/ui'
 import { useLanguage } from '../i18n/LanguageProvider'
 import type { Locale } from '../i18n/messages'
 import { getFacility, getQuote, type FacilityDetail, type PriceQuote } from '../lib/api'
-import { vehicleLabel } from '../lib/constants'
+import { amenityLabel, VEHICLE_ICONS, VEHICLE_TYPES } from '../lib/constants'
 import { openDirections } from '../lib/directions'
 import { formatDistance, formatMoney, formatTimeRange } from '../lib/format'
 import { useUserLocation } from '../lib/location'
@@ -43,8 +43,6 @@ function Chip({ label, warning }: { label: string; warning?: boolean }) {
     </View>
   )
 }
-
-const HERO_HEIGHT = 180
 
 function defaultBooking(): BookingValue {
   const start = defaultStart()
@@ -186,6 +184,20 @@ export function FacilityDetailOverlay({
   const { isSaved, toggleSaved } = useSavedFacilities()
   const saved = isSaved(facilityId)
 
+  const vehicleSegments = useMemo<Segment[]>(
+    () =>
+      VEHICLE_TYPES.map((vt) => ({
+        value: vt.value,
+        label: t(vt.labelKey),
+        icon: VEHICLE_ICONS[vt.value] ?? 'car',
+      })),
+    [t],
+  )
+
+  function setVehicleType(vehicleType: string) {
+    setBooking({ ...(booking ?? initialBooking ?? defaultBooking()), vehicleType })
+  }
+
   // While the overlay is mounted, the Android hardware back closes it instead of
   // popping the underlying route (which would leave the tab stack, not the overlay).
   useEffect(() => {
@@ -260,7 +272,7 @@ export function FacilityDetailOverlay({
   if (loading) {
     return (
       <View style={[styles.root, { backgroundColor: colors.bg }]}>
-        <View style={[styles.hero, { height: HERO_HEIGHT, backgroundColor: colors.pri }]}>
+        <View style={[styles.hero, { backgroundColor: colors.pri }]}>
           {heroButtons}
         </View>
         <View style={styles.center}>
@@ -273,7 +285,7 @@ export function FacilityDetailOverlay({
   if (error || !facility) {
     return (
       <View style={[styles.root, { backgroundColor: colors.bg }]}>
-        <View style={[styles.hero, { height: HERO_HEIGHT, backgroundColor: colors.pri }]}>
+        <View style={[styles.hero, { backgroundColor: colors.pri }]}>
           {heroButtons}
         </View>
         <View style={styles.center}>
@@ -290,18 +302,9 @@ export function FacilityDetailOverlay({
 
   return (
     <View style={[styles.root, { backgroundColor: colors.bg }]}>
-      <View style={[styles.hero, { height: HERO_HEIGHT }]}>
-        <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="heroGrad" x1="0" y1="0" x2="1" y2="1">
-              <Stop offset="0" stopColor={colors.pri} />
-              <Stop offset="1" stopColor={colors.pri2} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#heroGrad)" />
-        </Svg>
+      <View style={[styles.hero, { backgroundColor: colors.pri }]}>
         <View style={styles.heroWatermark}>
-          <LogoMark size={150} color="#fff" />
+          <LogoMark size={100} color="#fff" />
         </View>
         {heroButtons}
         <View style={styles.heroContent}>
@@ -326,12 +329,12 @@ export function FacilityDetailOverlay({
         </View>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: spacing.md }]}>
+      <ScrollView contentContainerStyle={styles.content}>
         <Card style={[styles.card, styles.cardRadius]}>
           <Text style={[styles.cardTitle, { color: colors.muted }]}>{t('amenitiesTitle')}</Text>
           <View style={styles.wrap}>
             {facility.amenities.map((a) => (
-              <Chip key={a} label={a} />
+              <Chip key={a} label={amenityLabel(a, t)} />
             ))}
             {facility.heightRestrictionCm ? (
               <Chip
@@ -357,45 +360,31 @@ export function FacilityDetailOverlay({
             }
             style={({ pressed }) => [
               styles.pickRow,
-              { backgroundColor: colors.card2, borderColor: colors.line },
-              pressed && styles.pickRowPressed,
-            ]}
-          >
-            <Ionicons name="time-outline" size={16} color={colors.ink} />
-            <Text style={[styles.rowLabel, styles.pickLabel, { color: colors.muted }]}>
-              {t('bookingDuration')}
-            </Text>
-            <View style={styles.pickValue}>
-              <Text style={[styles.rowValue, { color: colors.ink }]}>
-                {booking
-                  ? formatTimeRange(booking.startsAt, booking.endsAt, locale)
-                  : t('bookingTapToSelect')}
-              </Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-            </View>
-          </Pressable>
-          <Pressable
-            onPress={() =>
-              openTimePicker(booking ?? initialBooking ?? defaultBooking(), setBooking)
-            }
-            style={({ pressed }) => [
-              styles.pickRow,
               styles.pickRowLast,
               { backgroundColor: colors.card2, borderColor: colors.line },
               pressed && styles.pickRowPressed,
             ]}
           >
-            <Ionicons name="car-outline" size={16} color={colors.ink} />
-            <Text style={[styles.rowLabel, styles.pickLabel, { color: colors.muted }]}>
-              {t('bookingVehicle')}
-            </Text>
-            <View style={styles.pickValue}>
-              <Text style={[styles.rowValue, { color: colors.ink }]}>
-                {booking ? vehicleLabel(booking.vehicleType, t) : t('bookingTapToSelect')}
+            <Ionicons name="time-outline" size={18} color={colors.pri} />
+            <View style={styles.pickTextCol}>
+              <Text style={[styles.pickLabel, { color: colors.muted }]}>
+                {t('bookingDuration')}
               </Text>
-              <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              <Text style={[styles.pickValue, { color: colors.ink }]}>
+                {booking
+                  ? formatTimeRange(booking.startsAt, booking.endsAt, locale)
+                  : t('bookingTapToSelect')}
+              </Text>
             </View>
+            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
           </Pressable>
+
+          <Text style={[styles.vehicleLabel, { color: colors.muted }]}>{t('bookingVehicle')}</Text>
+          <SegmentedControl
+            segments={vehicleSegments}
+            value={booking?.vehicleType ?? initialBooking?.vehicleType ?? 'CAR'}
+            onChange={setVehicleType}
+          />
         </Card>
 
         <Card style={[styles.card, styles.cardRadius]}>
@@ -459,6 +448,8 @@ export function FacilityDetailOverlay({
           <Button
             label={t('bookingBook')}
             icon="arrow-forward"
+            iconPosition="trailing"
+            animateIcon
             disabled={!booking || !quote}
             onPress={() => {
               if (!booking || !quote) return
@@ -474,18 +465,13 @@ export function FacilityDetailOverlay({
 const styles = StyleSheet.create({
   root: { flex: 1 },
   hero: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
+    width: '100%',
     justifyContent: 'flex-end',
     padding: spacing.md,
     overflow: 'hidden',
   },
   heroButtonRow: {
-    position: 'absolute',
-    left: spacing.md,
-    right: spacing.md,
+    marginBottom: spacing.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     zIndex: 10,
@@ -501,11 +487,11 @@ const styles = StyleSheet.create({
   iconBackdropPressed: { opacity: 0.75 },
   heroWatermark: {
     position: 'absolute',
-    right: -14,
-    bottom: -14,
+    right: -spacing.md,
+    bottom: -spacing.md,
     opacity: 0.22,
   },
-  heroContent: { gap: 4 },
+  heroContent: {marginTop: spacing.xl, gap: 4 },
   heroTitle: { fontSize: 23, fontWeight: typography.display.fontWeight, color: '#fff' },
   heroAddress: {
     fontSize: typography.body.fontSize,
@@ -513,7 +499,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   heroRating: { fontSize: typography.caption.fontSize, color: 'rgba(255,255,255,0.85)' },
-  content: { padding: spacing.md, paddingTop: HERO_HEIGHT + spacing.md, paddingBottom: spacing.xl },
+  content: {padding: spacing.md, paddingBottom: spacing.xl },
   pickRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -526,8 +512,15 @@ const styles = StyleSheet.create({
   },
   pickRowLast: { marginBottom: 0 },
   pickRowPressed: { opacity: 0.6 },
-  pickLabel: { flex: 1 },
-  pickValue: { flexDirection: 'row', alignItems: 'center', gap: 4, flexShrink: 1 },
+  pickTextCol: { flex: 1, gap: 2 },
+  pickLabel: { fontSize: typography.caption.fontSize },
+  pickValue: { fontSize: 14, fontWeight: '700' },
+  vehicleLabel: {
+    fontSize: typography.caption.fontSize,
+    fontWeight: '600',
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -538,7 +531,7 @@ const styles = StyleSheet.create({
   },
   footerTotal: { flexShrink: 1 },
   footerBtn: { flex: 1 },
-  center: { flex: 1, alignItems: 'center', justifyContent: 'center', marginTop: HERO_HEIGHT },
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   directions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   directionsPressed: { opacity: 0.6 },
   card: { marginTop: spacing.md },

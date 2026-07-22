@@ -1,3 +1,5 @@
+import type { MaterialCommunityIcons } from '@expo/vector-icons'
+
 // Map camera fallback until a device GPS fix arrives (or if permission denied).
 export const FALLBACK_CENTER: { lat: number; lng: number } = { lat: 37.9754, lng: 23.7348 }
 
@@ -13,6 +15,13 @@ export const VEHICLE_TYPES = [
 export function vehicleLabel(vehicleType: string, t: (key: string) => string): string {
   const entry = VEHICLE_TYPES.find((v) => v.value === vehicleType)
   return entry ? t(entry.labelKey) : vehicleType
+}
+
+export const VEHICLE_ICONS: Record<string, keyof typeof MaterialCommunityIcons.glyphMap> = {
+  CAR: 'car',
+  MOTORCYCLE: 'motorbike',
+  VAN: 'van-passenger',
+  TRUCK: 'truck',
 }
 
 export const AMENITY_TYPES = [
