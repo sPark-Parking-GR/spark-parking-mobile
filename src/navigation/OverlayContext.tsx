@@ -66,6 +66,7 @@ export interface OverlayContextValue {
     totalCents: number
     currency: string
   }) => void
+  viewTicket: (trip: TripRecord) => void
   closeOverlay: () => void
   closeSheet: () => void
 }
@@ -135,6 +136,18 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
     [addTrip],
   )
 
+  const viewTicket = useCallback((trip: TripRecord) => {
+    setOverlay({
+      type: 'ticket',
+      facilityId: trip.facilityId,
+      facilityName: trip.facilityName,
+      code: trip.code,
+      booking: { startsAt: trip.startsAt, endsAt: trip.endsAt, vehicleType: trip.vehicleType },
+      totalCents: trip.totalCents,
+      currency: trip.currency,
+    })
+  }, [])
+
   const closeOverlay = useCallback(() => {
     setOverlay(null)
   }, [])
@@ -153,6 +166,7 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       openFilters,
       openReview,
       openTicket,
+      viewTicket,
       closeOverlay,
       closeSheet,
     }),
@@ -165,6 +179,7 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       openFilters,
       openReview,
       openTicket,
+      viewTicket,
       closeOverlay,
       closeSheet,
     ],

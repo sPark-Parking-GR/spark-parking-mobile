@@ -11,7 +11,7 @@ import { useOverlay } from '../../src/navigation/OverlayContext'
 export default function TripsScreen() {
   const { colors } = useTheme()
   const { t, locale } = useLanguage()
-  const { trips, openFacilityDetail } = useOverlay()
+  const { trips, openFacilityDetail, viewTicket } = useOverlay()
   const insets = useSafeAreaInsets()
   const barOffset = tabBarFloatOffset(insets.bottom)
 
@@ -20,30 +20,32 @@ export default function TripsScreen() {
   const renderItem = ({ item }: { item: TripRecord }) => {
     const isActive = new Date(item.endsAt) > new Date()
     return (
-      <Card padding={16} style={styles.card}>
-        <View style={styles.headerRow}>
-          <Badge variant={isActive ? 'ok' : 'neutral'}>
-            {isActive ? t('tripsActive') : t('tripsPast')}
-          </Badge>
-          <Text style={[styles.price, { color: colors.ink }]}>
-            {formatMoney(item.totalCents, locale, item.currency)}
-          </Text>
-        </View>
-        <Text style={[styles.facilityName, { color: colors.ink }]} numberOfLines={1}>
-          {item.facilityName}
-        </Text>
-        <Text style={[styles.recap, { color: colors.muted }]}>
-          {formatTimeRange(item.startsAt, item.endsAt, locale)} · {vehicleLabel(item.vehicleType, t)}
-        </Text>
-        <View style={[styles.footerRow, { borderTopColor: colors.line }]}>
-          <Text style={[styles.code, { color: colors.pri }]}>{item.code}</Text>
-          <Pressable onPress={() => openFacilityDetail(item.facilityId)} hitSlop={8}>
-            <Text style={[styles.directions, { color: colors.pri }]}>
-              {t('tripsDirections')} →
+      <Pressable onPress={() => viewTicket(item)}>
+        <Card padding={16} style={styles.card}>
+          <View style={styles.headerRow}>
+            <Badge variant={isActive ? 'ok' : 'neutral'}>
+              {isActive ? t('tripsActive') : t('tripsPast')}
+            </Badge>
+            <Text style={[styles.price, { color: colors.ink }]}>
+              {formatMoney(item.totalCents, locale, item.currency)}
             </Text>
-          </Pressable>
-        </View>
-      </Card>
+          </View>
+          <Text style={[styles.facilityName, { color: colors.ink }]} numberOfLines={1}>
+            {item.facilityName}
+          </Text>
+          <Text style={[styles.recap, { color: colors.muted }]}>
+            {formatTimeRange(item.startsAt, item.endsAt, locale)} · {vehicleLabel(item.vehicleType, t)}
+          </Text>
+          <View style={[styles.footerRow, { borderTopColor: colors.line }]}>
+            <Text style={[styles.code, { color: colors.pri }]}>{item.code}</Text>
+            <Pressable onPress={() => openFacilityDetail(item.facilityId)} hitSlop={8}>
+              <Text style={[styles.directions, { color: colors.pri }]}>
+                {t('tripsDirections')} →
+              </Text>
+            </Pressable>
+          </View>
+        </Card>
+      </Pressable>
     )
   }
 
