@@ -9,6 +9,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -62,6 +63,9 @@ function minuteToHHMM(minute: number): string {
 function centsToCurrency(cents: number, locale: Locale): string {
   return formatMoney(cents, locale, 'EUR')
 }
+
+const HERO_CONTENT_GAP_RATIO = 0.012
+const HERO_BUTTON_SIZE = 40
 
 type TariffPlan = NonNullable<FacilityDetail['tariffAssignments'][number]['tariffPlan']>
 
@@ -172,6 +176,7 @@ export function FacilityDetailOverlay({
   const { closeOverlay, openTimePicker, openReview } = useOverlay()
   const { t, locale } = useLanguage()
   const insets = useSafeAreaInsets()
+  const { height: windowHeight } = useWindowDimensions()
   const { colors } = useTheme()
   const { coords } = useUserLocation()
 
@@ -248,7 +253,7 @@ export function FacilityDetailOverlay({
   }, [facilityId, booking?.startsAt, booking?.endsAt, booking?.vehicleType])
 
   const heroButtons = (
-    <View style={[styles.heroButtonRow, { top: insets.top + spacing.sm }]}>
+    <View style={[styles.heroButtonRow, { marginTop: insets.top + spacing.sm }]}>
       <Pressable
         onPress={closeOverlay}
         style={({ pressed }) => [styles.iconBackdrop, pressed && styles.iconBackdropPressed]}
@@ -272,9 +277,7 @@ export function FacilityDetailOverlay({
   if (loading) {
     return (
       <View style={[styles.root, { backgroundColor: colors.bg }]}>
-        <View style={[styles.hero, { backgroundColor: colors.pri }]}>
-          {heroButtons}
-        </View>
+        <View style={[styles.hero, { backgroundColor: colors.pri }]}>{heroButtons}</View>
         <View style={styles.center}>
           <ActivityIndicator color={colors.pri} />
         </View>
@@ -285,9 +288,7 @@ export function FacilityDetailOverlay({
   if (error || !facility) {
     return (
       <View style={[styles.root, { backgroundColor: colors.bg }]}>
-        <View style={[styles.hero, { backgroundColor: colors.pri }]}>
-          {heroButtons}
-        </View>
+        <View style={[styles.hero, { backgroundColor: colors.pri }]}>{heroButtons}</View>
         <View style={styles.center}>
           <Text style={[styles.error, { color: colors.bad }]}>
             {error ?? t('facilityNotFound')}
@@ -307,7 +308,7 @@ export function FacilityDetailOverlay({
           <LogoMark size={100} color="#fff" />
         </View>
         {heroButtons}
-        <View style={styles.heroContent}>
+        <View style={[styles.heroContent, { marginTop: windowHeight * HERO_CONTENT_GAP_RATIO }]}>
           <Text style={styles.heroTitle}>{facility.name}</Text>
           <Pressable
             onPress={() =>
@@ -466,20 +467,20 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   hero: {
     width: '100%',
-    justifyContent: 'flex-end',
+    justifyContent: 'flex-start',
     padding: spacing.md,
     overflow: 'hidden',
   },
   heroButtonRow: {
-    marginBottom: spacing.md,
+    marginBottom: spacing.xs,
     flexDirection: 'row',
     justifyContent: 'space-between',
     zIndex: 10,
   },
   iconBackdrop: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: HERO_BUTTON_SIZE,
+    height: HERO_BUTTON_SIZE,
+    borderRadius: HERO_BUTTON_SIZE / 2,
     backgroundColor: 'rgba(0,0,0,0.28)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -491,7 +492,7 @@ const styles = StyleSheet.create({
     bottom: -spacing.md,
     opacity: 0.22,
   },
-  heroContent: {marginTop: spacing.xl, gap: 4 },
+  heroContent: { gap: 4 },
   heroTitle: { fontSize: 23, fontWeight: typography.display.fontWeight, color: '#fff' },
   heroAddress: {
     fontSize: typography.body.fontSize,
@@ -499,7 +500,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   heroRating: { fontSize: typography.caption.fontSize, color: 'rgba(255,255,255,0.85)' },
-  content: {padding: spacing.md, paddingBottom: spacing.xl },
+  content: { padding: spacing.md, paddingBottom: spacing.xl },
   pickRow: {
     flexDirection: 'row',
     alignItems: 'center',
