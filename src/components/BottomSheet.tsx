@@ -117,9 +117,11 @@ export function BottomSheet({
 
   // Tracks the sheet's actual visible height continuously — every drag frame,
   // detent snap, and programmatic collapse — so dependents never fall out of
-  // sync the way a coarse expanded/collapsed boolean would.
+  // sync the way a coarse expanded/collapsed boolean would. Capped at halfH so
+  // floating controls stop climbing past the half detent and instead get
+  // covered by the sheet as it keeps opening toward full.
   useAnimatedReaction(
-    () => fullH - ty.value,
+    () => Math.min(fullH - ty.value, halfH),
     (current, previous) => {
       if (heightValue && current !== previous) heightValue.value = current
     },

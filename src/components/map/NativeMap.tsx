@@ -1,6 +1,6 @@
 import { typography, useTheme } from '@spark/ui'
 import { useEffect, useRef } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
+import { StyleSheet, Text, useWindowDimensions, View } from 'react-native'
 import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps'
 
 import { MapPin, PIN_ANCHOR } from './logo'
@@ -43,9 +43,11 @@ export function NativeMap({
   onUserGesture,
   onMapPress,
   onSpotSelect,
+  getCenterOffsetPx,
 }: MapProps) {
   const { colors } = useTheme()
   const ref = useRef<MapView>(null)
+  const { height: screenHeight } = useWindowDimensions()
 
   const region: Region = {
     latitude: center.lat,
@@ -55,7 +57,11 @@ export function NativeMap({
   }
 
   useEffect(() => {
-    ref.current?.animateToRegion(region, 350)
+    // This region always resets to the fixed DELTA zoom, so (unlike the spot-tap
+    // centering below) the resulting latitude span is known upfront — no need to
+    // query the live camera bounds first.
+    const offsetLat = (getCenterOffsetPx() / screenHeight) * DELTA
+    ref.current?.animateToRegion({ ...region, latitude: center.lat - offsetLat }, 350)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center.lat, center.lng, centerNonce])
 
@@ -117,15 +123,27 @@ export function NativeMap({
           anchor={PIN_ANCHOR}
           onPress={async () => {
             onSpotSelect(r.id)
-            const cam = await ref.current?.getCamera()
+            const [cam, bounds] = await Promise.all([
+              ref.current?.getCamera(),
+              ref.current?.getMapBoundaries(),
+            ])
+            // Shift the target north by the center offset (converted from px to
+            // degrees via the currently visible latitude span), so the spot lands
+            // in the middle of the viewport still visible between the top bar and
+            // the sheet/selected-spot card, not behind either.
+            const latitudeDelta = bounds
+              ? bounds.northEast.latitude - bounds.southWest.latitude
+              : DELTA
+            const offsetLat = (getCenterOffsetPx() / screenHeight) * latitudeDelta
+            const targetLat = r.lat - offsetLat
             if (
               cam &&
-              Math.abs(cam.center.latitude - r.lat) < CENTER_EPS &&
+              Math.abs(cam.center.latitude - targetLat) < CENTER_EPS &&
               Math.abs(cam.center.longitude - r.lng) < CENTER_EPS
             )
               return
             ref.current?.animateCamera(
-              { center: { latitude: r.lat, longitude: r.lng } },
+              { center: { latitude: targetLat, longitude: r.lng } },
               { duration: 350 },
             )
           }}

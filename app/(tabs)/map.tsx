@@ -4,7 +4,12 @@ import { spacing, useTheme } from '@spark/ui'
 import { useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
+import Animated, {
+  FadeIn,
+  FadeOut,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { defaultEnd, defaultStart, type BookingValue } from '../../src/components/BookingForm'
@@ -120,6 +125,29 @@ export default function MapScreen() {
   const floatingStyle = useAnimatedStyle(() => ({
     bottom: sheetHeight.value + FAB_GAP_ABOVE_SHEET,
   }))
+  // Measured once the selected-spot card has laid out at least once; kept across
+  // deselects so the very next selection already has a good estimate.
+  const cardHeightRef = useRef(130)
+  // Mirrors selectedId synchronously (state updates land a render later, too
+  // late for the centering math below, which runs in the same tap handler that
+  // sets selectedId).
+  const selectedIdRef = useRef<string | null>(null)
+
+  // Space the floating top bar (search pill + filters button) occupies, plus a
+  // gap below it — mirrors FAB_GAP_ABOVE_SHEET's role at the bottom, so the
+  // "available viewport" doesn't hug either edge.
+  const topOcclusion = insets.top + spacing.sm + TOP_ROW_HEIGHT + spacing.sm
+
+  // How far (px) a centered point should shift from the literal screen middle,
+  // read fresh whenever the map centers a point — spot taps and recenter-to-user
+  // alike — so it lands in the middle of the viewport still actually visible
+  // between the top bar and the bottom sheet (+ card, if one is showing), across
+  // all four sheet-detent × card combinations.
+  const getCenterOffsetPx = useCallback(() => {
+    const bottomOcclusion =
+      sheetHeight.value + (selectedIdRef.current ? FAB_GAP_ABOVE_SHEET + cardHeightRef.current : 0)
+    return (bottomOcclusion - topOcclusion) / 2
+  }, [topOcclusion])
 
   function recenterTo(c: { lat: number; lng: number }) {
     setCenter(c)
@@ -133,6 +161,7 @@ export default function MapScreen() {
     useCallback(() => {
       return () => {
         setCollapseNonce((n) => n + 1)
+        selectedIdRef.current = null
         setSelectedId(null)
       }
     }, []),
@@ -323,6 +352,22 @@ export default function MapScreen() {
     [mapResults, selectedId],
   )
 
+  // Close the card once its spot pans out of view — a stale card pointing at an
+  // off-screen pin is confusing, and there's no longer a marker to tap to re-open
+  // it. Re-checks only when the viewport itself settles, not on every selection
+  // change: onRegionChange is debounced, so a spot tapped right after panning
+  // back into view would otherwise get validated against the still-stale
+  // pre-pan bounds and close right back up.
+  useEffect(() => {
+    if (!selectedId || !visibleBounds) return
+    const spot = mapResults.find((r) => r.id === selectedId)
+    if (spot && !within(visibleBounds, spot)) {
+      selectedIdRef.current = null
+      setSelectedId(null)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [visibleBounds])
+
   return (
     <View style={styles.root}>
       <View style={StyleSheet.absoluteFill}>
@@ -343,13 +388,18 @@ export default function MapScreen() {
             setAtUser(false)
           }}
           onMapPress={() => {
+            if (selectedId) {
+              selectedIdRef.current = null
+              setSelectedId(null)
+              return
+            }
             setCollapseNonce((n) => n + 1)
-            setSelectedId(null)
           }}
           onSpotSelect={(id) => {
-            setCollapseNonce((n) => n + 1)
+            selectedIdRef.current = id
             setSelectedId(id)
           }}
+          getCenterOffsetPx={getCenterOffsetPx}
         />
       </View>
 
@@ -376,7 +426,14 @@ export default function MapScreen() {
       </View>
 
       {selected ? (
-        <Animated.View style={[styles.cardWrap, floatingStyle]}>
+        <Animated.View
+          style={[styles.cardWrap, floatingStyle]}
+          entering={FadeIn.duration(180)}
+          exiting={FadeOut.duration(150)}
+          onLayout={(e) => {
+            cardHeightRef.current = e.nativeEvent.layout.height
+          }}
+        >
           <SelectedFacilityCard
             facility={selected}
             onDetails={() => openFacility(selected.id)}

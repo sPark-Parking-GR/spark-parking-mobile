@@ -45,7 +45,28 @@ function buildHtml(
     function post(msg) {
       window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(msg));
     }
-    window.recenter = function (lat, lng) { programmatic = true; map.setView([lat, lng], DEFAULT_ZOOM, { animate: true }); };
+    // Shifts a target point's on-screen position by offsetPx (positive moves it
+    // up, toward the top bar's clear side; negative moves it down, toward the
+    // sheet/card's clear side), so it lands in the middle of the viewport still
+    // actually visible between the top bar and the bottom sheet/card. offsetPx
+    // is read fresh from the RN side at the moment of centering.
+    function offsetLatLng(lat, lng, zoom, offsetPx) {
+      if (!offsetPx) return L.latLng(lat, lng);
+      var p = map.project([lat, lng], zoom);
+      return map.unproject([p.x, p.y + offsetPx], zoom);
+    }
+    window.recenter = function (lat, lng, offsetPx) {
+      programmatic = true;
+      map.setView(offsetLatLng(lat, lng, DEFAULT_ZOOM, offsetPx), DEFAULT_ZOOM, { animate: true });
+    };
+    window.centerOnSpot = function (lat, lng, offsetPx) {
+      var target = offsetLatLng(lat, lng, map.getZoom(), offsetPx);
+      var c = map.getCenter();
+      if (Math.abs(c.lat - target.lat) < CENTER_EPS && Math.abs(c.lng - target.lng) < CENTER_EPS) return;
+      selecting = true;
+      map.setView(target, map.getZoom(), { animate: true });
+      map.once('moveend', function () { selecting = false; });
+    };
     window.fitBounds = function (s, w, n, e) {
       programmatic = true;
       map.fitBounds([[s, w], [n, e]], { padding: [60, 60], maxZoom: 16, animate: true });
@@ -120,13 +141,8 @@ function buildHtml(
         m = L.marker([it.lat, it.lng], { icon: makeIcon(it.available) }).addTo(layer);
         m._available = it.available;
         m.on('click', function () {
-          post({ type: 'spotpress', id: it.id });
           var ll = m.getLatLng();
-          var c = map.getCenter();
-          if (Math.abs(c.lat - ll.lat) < CENTER_EPS && Math.abs(c.lng - ll.lng) < CENTER_EPS) return;
-          selecting = true;
-          map.setView([ll.lat, ll.lng], map.getZoom(), { animate: true });
-          map.once('moveend', function () { selecting = false; });
+          post({ type: 'spotpress', id: it.id, lat: ll.lat, lng: ll.lng });
         });
         markers[it.id] = m;
       });
@@ -181,6 +197,7 @@ export function LeafletMap({
   onUserGesture,
   onMapPress,
   onSpotSelect,
+  getCenterOffsetPx,
 }: MapProps) {
   const { mode, colors } = useTheme()
   const ref = useRef<WebView>(null)
@@ -210,7 +227,9 @@ export function LeafletMap({
   }
 
   function recenter() {
-    ref.current?.injectJavaScript(`window.recenter(${center.lat}, ${center.lng}); true;`)
+    ref.current?.injectJavaScript(
+      `window.recenter(${center.lat}, ${center.lng}, ${getCenterOffsetPx()}); true;`,
+    )
   }
 
   function renderUser() {
@@ -279,6 +298,12 @@ export function LeafletMap({
         onMapPress()
       } else if (msg.type === 'spotpress' && msg.id) {
         onSpotSelect(msg.id)
+        if (msg.lat != null && msg.lng != null) {
+          const offset = getCenterOffsetPx()
+          ref.current?.injectJavaScript(
+            `window.centerOnSpot(${msg.lat}, ${msg.lng}, ${offset}); true;`,
+          )
+        }
       } else if (
         msg.type === 'region' &&
         msg.lat != null &&
