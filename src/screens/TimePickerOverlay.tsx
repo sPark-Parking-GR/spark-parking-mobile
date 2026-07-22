@@ -9,9 +9,11 @@ import { useOverlay } from '../navigation/OverlayContext'
 export function TimePickerOverlay({
   initial,
   onApply,
+  showVehicleSelector = true,
 }: {
   initial: BookingValue
   onApply: (next: BookingValue) => void
+  showVehicleSelector?: boolean
 }) {
   const { closeSheet } = useOverlay()
   const { t } = useLanguage()
@@ -27,7 +29,7 @@ export function TimePickerOverlay({
 
   return (
     <>
-      <BookingForm initial={initial} onChange={setDraft} />
+      <BookingForm initial={initial} onChange={setDraft} showVehicleSelector={showVehicleSelector} />
       <Button
         label={t('bookingApply')}
         icon="checkmark"

@@ -31,7 +31,12 @@ export type OverlayState =
 // rather than replacing it. Sharing one slot used to mean opening the time/vehicle
 // sheet from the facility detail screen unmounted it, exposing the map underneath.
 export type SheetState =
-  | { type: 'timePicker'; initial: BookingValue; onApply: (next: BookingValue) => void }
+  | {
+      type: 'timePicker'
+      initial: BookingValue
+      onApply: (next: BookingValue) => void
+      showVehicleSelector: boolean
+    }
   | { type: 'filters' }
   | null
 
@@ -40,7 +45,11 @@ export interface OverlayContextValue {
   sheet: SheetState
   trips: TripRecord[]
   openFacilityDetail: (facilityId: string, booking?: BookingValue) => void
-  openTimePicker: (initial: BookingValue, onApply: (next: BookingValue) => void) => void
+  openTimePicker: (
+    initial: BookingValue,
+    onApply: (next: BookingValue) => void,
+    showVehicleSelector?: boolean,
+  ) => void
   openFilters: () => void
   openReview: (
     facilityId: string,
@@ -73,8 +82,12 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
   }, [])
 
   const openTimePicker = useCallback(
-    (initial: BookingValue, onApply: (next: BookingValue) => void) => {
-      setSheet({ type: 'timePicker', initial, onApply })
+    (
+      initial: BookingValue,
+      onApply: (next: BookingValue) => void,
+      showVehicleSelector = true,
+    ) => {
+      setSheet({ type: 'timePicker', initial, onApply, showVehicleSelector })
     },
     [],
   )

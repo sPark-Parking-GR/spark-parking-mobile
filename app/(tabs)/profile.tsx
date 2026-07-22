@@ -14,7 +14,7 @@ const LANGUAGE_OPTIONS: { value: Locale; label: string }[] = [
 ]
 
 export default function ProfileScreen() {
-  const { colors, mode, setOverride } = useTheme()
+  const { colors, radii, mode, setOverride } = useTheme()
   const { locale, setLocale, t } = useLanguage()
   const insets = useSafeAreaInsets()
   const barOffset = tabBarFloatOffset(insets.bottom)
@@ -40,38 +40,40 @@ export default function ProfileScreen() {
       </View>
 
       <Card padding={0} style={styles.card}>
-        <View style={styles.settingsBlock}>
-          <Text style={[styles.eyebrow, { color: colors.muted }]}>{t('settings')}</Text>
-          <View style={[styles.row, styles.rowSpaced]}>
-            <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('language')}</Text>
-            <SegmentedControl
-              options={LANGUAGE_OPTIONS}
-              value={locale}
-              onChange={(next) => setLocale(next as Locale)}
-            />
+        <View style={[styles.cardClip, { borderRadius: radii.lg }]}>
+          <View style={styles.settingsBlock}>
+            <Text style={[styles.eyebrow, { color: colors.muted }]}>{t('settings')}</Text>
+            <View style={[styles.row, styles.rowSpaced]}>
+              <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('language')}</Text>
+              <SegmentedControl
+                options={LANGUAGE_OPTIONS}
+                value={locale}
+                onChange={(next) => setLocale(next as Locale)}
+              />
+            </View>
+            <View style={styles.row}>
+              <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('theme')}</Text>
+              <SegmentedControl
+                options={THEME_OPTIONS}
+                value={mode}
+                onChange={(next) => setOverride(next as ThemeMode)}
+              />
+            </View>
           </View>
-          <View style={styles.row}>
-            <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('theme')}</Text>
-            <SegmentedControl
-              options={THEME_OPTIONS}
-              value={mode}
-              onChange={(next) => setOverride(next as ThemeMode)}
-            />
+          <View style={[styles.divider, { backgroundColor: colors.line }]} />
+          <View style={styles.inertRow}>
+            <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('profilePaymentMethods')}</Text>
+            <Text style={[styles.inertValue, { color: colors.faint }]}>
+              {t('profileNotAvailableYet')}
+            </Text>
           </View>
-        </View>
-        <View style={[styles.divider, { backgroundColor: colors.line }]} />
-        <View style={styles.inertRow}>
-          <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('profilePaymentMethods')}</Text>
-          <Text style={[styles.inertValue, { color: colors.faint }]}>
-            {t('profileNotAvailableYet')}
-          </Text>
-        </View>
-        <View style={[styles.divider, { backgroundColor: colors.line }]} />
-        <View style={styles.inertRow}>
-          <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('profileHelp')}</Text>
-          <Text style={[styles.inertValue, { color: colors.faint }]}>
-            {t('profileNotAvailableYet')}
-          </Text>
+          <View style={[styles.divider, { backgroundColor: colors.line }]} />
+          <View style={styles.inertRow}>
+            <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('profileHelp')}</Text>
+            <Text style={[styles.inertValue, { color: colors.faint }]}>
+              {t('profileNotAvailableYet')}
+            </Text>
+          </View>
         </View>
       </Card>
 
@@ -99,7 +101,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   name: { fontSize: typography.heading.fontSize, fontWeight: typography.heading.fontWeight },
-  card: { marginBottom: spacing.md, overflow: 'hidden' },
+  card: { marginBottom: spacing.md },
+  cardClip: { overflow: 'hidden' },
   settingsBlock: { paddingHorizontal: spacing.md, paddingTop: 15, paddingBottom: 15 },
   eyebrow: {
     fontSize: typography.eyebrow.fontSize,

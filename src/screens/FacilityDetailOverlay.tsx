@@ -357,7 +357,7 @@ export function FacilityDetailOverlay({
           </Text>
           <Pressable
             onPress={() =>
-              openTimePicker(booking ?? initialBooking ?? defaultBooking(), setBooking)
+              openTimePicker(booking ?? initialBooking ?? defaultBooking(), setBooking, false)
             }
             style={({ pressed }) => [
               styles.pickRow,

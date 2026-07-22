@@ -277,7 +277,11 @@ export default function TabsLayout() {
 
         <Sheet open={sheet?.type === 'timePicker'} onClose={closeSheet}>
           {timePicker ? (
-            <TimePickerOverlay initial={timePicker.initial} onApply={timePicker.onApply} />
+            <TimePickerOverlay
+              initial={timePicker.initial}
+              onApply={timePicker.onApply}
+              showVehicleSelector={timePicker.showVehicleSelector}
+            />
           ) : null}
         </Sheet>
 

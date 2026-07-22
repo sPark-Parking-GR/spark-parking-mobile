@@ -93,22 +93,24 @@ export function Button({
         styles.btn,
         isSecondary
           ? { backgroundColor: 'transparent', borderColor: colors.line }
-          : { borderColor: 'transparent', overflow: 'hidden' },
+          : { borderColor: 'transparent' },
         !isSecondary && !disabled && !loading && styles.btnGlow,
         pressed && !disabled && styles.btnPressed,
         (disabled || loading) && styles.btnDisabled,
       ]}
     >
       {!isSecondary && (
-        <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
-          <Defs>
-            <LinearGradient id="btnGrad" x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0" stopColor={colors.pri} />
-              <Stop offset="1" stopColor={colors.pri2} />
-            </LinearGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#btnGrad)" />
-        </Svg>
+        <View style={styles.btnGradientClip}>
+          <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+            <Defs>
+              <LinearGradient id="btnGrad" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={colors.pri} />
+                <Stop offset="1" stopColor={colors.pri2} />
+              </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#btnGrad)" />
+          </Svg>
+        </View>
       )}
       {loading ? (
         <ActivityIndicator color={fg} />
@@ -205,6 +207,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.35,
     shadowRadius: 26,
     elevation: 8,
+  },
+  btnGradientClip: {
+    ...StyleSheet.absoluteFillObject,
+    borderRadius: BTN_RADIUS,
+    overflow: 'hidden',
   },
   btnPressed: { opacity: 0.85 },
   btnDisabled: { opacity: 0.5 },

@@ -3,7 +3,9 @@ import { spacing, typography, useTheme } from '@spark/ui'
 import { useEffect, useMemo, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
+import { SegmentedControl, type Segment } from './SegmentedControl'
 import { useLanguage } from '../i18n/LanguageProvider'
+import { VEHICLE_ICONS, VEHICLE_TYPES } from '../lib/constants'
 
 export interface BookingValue {
   startsAt: string
@@ -47,9 +49,11 @@ function clampMinutes(minutes: number): number {
 export function BookingForm({
   initial,
   onChange,
+  showVehicleSelector = true,
 }: {
   initial?: Partial<BookingValue>
   onChange: (value: BookingValue) => void
+  showVehicleSelector?: boolean
 }) {
   const { colors, radii } = useTheme()
   const { t } = useLanguage()
@@ -64,10 +68,20 @@ export function BookingForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [start, initial?.endsAt])
 
-  const vehicleType = initial?.vehicleType ?? 'CAR'
+  const [vehicleType, setVehicleType] = useState(initial?.vehicleType ?? 'CAR')
   const [minutes, setMinutes] = useState(seedMinutes)
   const [customOpen, setCustomOpen] = useState(
     () => !DURATION_PRESETS.some((preset) => preset.minutes === seedMinutes),
+  )
+
+  const vehicleSegments = useMemo<Segment[]>(
+    () =>
+      VEHICLE_TYPES.map((vt) => ({
+        value: vt.value,
+        label: t(vt.labelKey),
+        icon: VEHICLE_ICONS[vt.value] ?? 'car',
+      })),
+    [t],
   )
 
   useEffect(() => {
@@ -144,6 +158,19 @@ export function BookingForm({
             onIncrement={() => adjustCustom(MINUTE_STEP_MIN)}
           />
         </View>
+      )}
+
+      {showVehicleSelector && (
+        <>
+          <Text style={[styles.eyebrow, { color: colors.muted, marginTop: spacing.sm }]}>
+            {t('bookingVehicle')}
+          </Text>
+          <SegmentedControl
+            segments={vehicleSegments}
+            value={vehicleType}
+            onChange={setVehicleType}
+          />
+        </>
       )}
     </View>
   )
