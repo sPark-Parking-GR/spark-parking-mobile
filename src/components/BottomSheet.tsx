@@ -48,6 +48,7 @@ export function BottomSheet({
   onExpandedChange,
   bottomInset,
   expandProgress,
+  heightValue,
 }: {
   results: FacilitySearchResult[]
   // The map is showing aggregated clusters (zoomed out), so the list is empty by
@@ -74,6 +75,9 @@ export function BottomSheet({
   bottomInset: number
   // Shared with the tab bar so its labels hide in lockstep as this sheet expands.
   expandProgress?: SharedValue<number>
+  // Live-updated with the sheet's current visible height (px above the screen
+  // bottom), so floating controls above it can track every detent and drag.
+  heightValue?: SharedValue<number>
 }) {
   const { colors } = useTheme()
   const { t } = useLanguage()
@@ -108,6 +112,16 @@ export function BottomSheet({
     () => progress.value,
     (current, previous) => {
       if (expandProgress && current !== previous) expandProgress.value = current
+    },
+  )
+
+  // Tracks the sheet's actual visible height continuously — every drag frame,
+  // detent snap, and programmatic collapse — so dependents never fall out of
+  // sync the way a coarse expanded/collapsed boolean would.
+  useAnimatedReaction(
+    () => fullH - ty.value,
+    (current, previous) => {
+      if (heightValue && current !== previous) heightValue.value = current
     },
   )
 

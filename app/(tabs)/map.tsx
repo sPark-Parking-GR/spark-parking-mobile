@@ -3,13 +3,15 @@ import { computeDistanceMeters, generalizedCostCents } from '@spark/maps'
 import { spacing, useTheme } from '@spark/ui'
 import { useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native'
+import { Pressable, StyleSheet, Text, View } from 'react-native'
+import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { defaultEnd, defaultStart, type BookingValue } from '../../src/components/BookingForm'
 import { BottomSheet, type SortMode } from '../../src/components/BottomSheet'
 import { Map } from '../../src/components/map'
 import type { MapBounds, MapRegion } from '../../src/components/map'
+import { SelectedFacilityCard } from '../../src/components/map/SelectedFacilityCard'
 import { useLanguage } from '../../src/i18n/LanguageProvider'
 import {
   searchFacilities,
@@ -31,8 +33,18 @@ const FIT_NEAREST = 4
 // Over-fetch this fraction beyond the viewport on each side, so small pans stay
 // inside the already-fetched area and need no new request.
 const FETCH_PADDING = 0.5
-const PEEK_FAB_BOTTOM = 148
+// Gap kept above the bottom sheet's current top edge for the recenter FAB and
+// the selected-spot card, so both sit close to the sheet without touching it —
+// at every detent and mid-drag position, not just peek/expanded.
+const FAB_GAP_ABOVE_SHEET = spacing.sm
+// Mirrors the sheet's own peek-detent header height (see BottomSheet's
+// PEEK_HEADER_ROOM), just to seed the shared value before the sheet's first
+// animated frame reports the real one — avoids a one-frame flash at bottom:0.
+const PEEK_HEADER_ROOM = 88
 const TOP_ROW_HEIGHT = 50
+const RECENTER_FAB_SIZE = 46
+// Keeps the selected-spot card clear of the recenter FAB to its right.
+const CARD_RIGHT_OFFSET = spacing.md + RECENTER_FAB_SIZE + spacing.sm
 
 function contains(outer: MapBounds, inner: MapBounds): boolean {
   return (
@@ -81,7 +93,6 @@ export default function MapScreen() {
   const { coords, status, retry } = useUserLocation()
   const { openFacilityDetail, openTimePicker, openFilters } = useOverlay()
   const insets = useSafeAreaInsets()
-  const { height: screenH } = useWindowDimensions()
   const barOffset = tabBarFloatOffset(insets.bottom)
   const sheetProgress = useSheetExpandProgress()
 
@@ -99,13 +110,16 @@ export default function MapScreen() {
   const [collapseNonce, setCollapseNonce] = useState(0)
   const [visibleBounds, setVisibleBounds] = useState<MapBounds | null>(null)
   const [atUser, setAtUser] = useState(false)
-  const [sheetExpanded, setSheetExpanded] = useState(false)
+  const [selectedId, setSelectedId] = useState<string | null>(null)
   const autoLocated = useRef(false)
   // The padded bounds the current results cover; pans inside it skip refetching.
   const lastFetched = useRef<MapBounds | null>(null)
-  // Mirrors the sheet's own half-detent math so the recenter FAB floats just above
-  // it instead of the sheet sliding over a control fixed at the peek offset.
-  const fabBottom = (sheetExpanded ? Math.round(screenH * 0.5) + 14 : PEEK_FAB_BOTTOM) + barOffset
+  // The sheet's live visible height (px above the screen bottom), mirrored from
+  // its internal translateY on every frame — see BottomSheet's heightValue prop.
+  const sheetHeight = useSharedValue(barOffset + PEEK_HEADER_ROOM)
+  const floatingStyle = useAnimatedStyle(() => ({
+    bottom: sheetHeight.value + FAB_GAP_ABOVE_SHEET,
+  }))
 
   function recenterTo(c: { lat: number; lng: number }) {
     setCenter(c)
@@ -117,7 +131,10 @@ export default function MapScreen() {
   // instead of staying expanded-looking on tabs that have no sheet at all.
   useFocusEffect(
     useCallback(() => {
-      return () => setCollapseNonce((n) => n + 1)
+      return () => {
+        setCollapseNonce((n) => n + 1)
+        setSelectedId(null)
+      }
     }, []),
   )
 
@@ -301,6 +318,11 @@ export default function MapScreen() {
     [results],
   )
 
+  const selected = useMemo(
+    () => mapResults.find((r) => r.id === selectedId) ?? null,
+    [mapResults, selectedId],
+  )
+
   return (
     <View style={styles.root}>
       <View style={StyleSheet.absoluteFill}>
@@ -313,8 +335,6 @@ export default function MapScreen() {
           results={mapResults}
           clusters={clusters}
           onClusterPress={() => {}}
-          onMarkerPress={openFacility}
-          onDirections={navigateTo}
           onRegionChange={onRegionChange}
           onUserGesture={() => {
             // A user gesture invalidates any search still queued for the
@@ -322,17 +342,20 @@ export default function MapScreen() {
             onRegionChange.cancel()
             setAtUser(false)
           }}
-          onMapPress={() => setCollapseNonce((n) => n + 1)}
-          onSpotSelect={() => setCollapseNonce((n) => n + 1)}
+          onMapPress={() => {
+            setCollapseNonce((n) => n + 1)
+            setSelectedId(null)
+          }}
+          onSpotSelect={(id) => {
+            setCollapseNonce((n) => n + 1)
+            setSelectedId(id)
+          }}
         />
       </View>
 
       <View style={[styles.topRow, { top: insets.top + spacing.sm }]}>
         <View
-          style={[
-            styles.searchPill,
-            { backgroundColor: colors.sheet, borderColor: colors.line },
-          ]}
+          style={[styles.searchPill, { backgroundColor: colors.sheet, borderColor: colors.line }]}
         >
           <Ionicons name="search" size={17} color={colors.muted} />
           <Text style={[styles.searchHint, { color: colors.muted }]} numberOfLines={1}>
@@ -352,20 +375,32 @@ export default function MapScreen() {
         </Pressable>
       </View>
 
-      <Pressable
-        onPress={locateMe}
-        style={({ pressed }) => [
-          styles.recenterFab,
-          { bottom: fabBottom, backgroundColor: colors.sheet, borderColor: colors.line },
-          pressed && styles.fabPressed,
-        ]}
-      >
-        <MaterialIcons
-          name={status === 'denied' ? 'gps-off' : atUser ? 'gps-fixed' : 'gps-not-fixed'}
-          size={20}
-          color={colors.pri}
-        />
-      </Pressable>
+      {selected ? (
+        <Animated.View style={[styles.cardWrap, floatingStyle]}>
+          <SelectedFacilityCard
+            facility={selected}
+            onDetails={() => openFacility(selected.id)}
+            onDirections={() => navigateTo(selected.id)}
+          />
+        </Animated.View>
+      ) : null}
+
+      <Animated.View style={[styles.recenterFabWrap, floatingStyle]}>
+        <Pressable
+          onPress={locateMe}
+          style={({ pressed }) => [
+            styles.recenterFab,
+            { backgroundColor: colors.sheet, borderColor: colors.line },
+            pressed && styles.fabPressed,
+          ]}
+        >
+          <MaterialIcons
+            name={status === 'denied' ? 'gps-off' : atUser ? 'gps-fixed' : 'gps-not-fixed'}
+            size={20}
+            color={colors.pri}
+          />
+        </Pressable>
+      </Animated.View>
 
       <BottomSheet
         results={listResults}
@@ -379,9 +414,9 @@ export default function MapScreen() {
         onSortCost={openCostPicker}
         costLabel={costLabel}
         cheapestId={cheapestId}
-        onExpandedChange={setSheetExpanded}
         bottomInset={barOffset}
         expandProgress={sheetProgress}
+        heightValue={sheetHeight}
       />
     </View>
   )
@@ -425,11 +460,14 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 4,
   },
-  recenterFab: {
+  recenterFabWrap: {
     position: 'absolute',
     right: spacing.md,
-    width: 46,
-    height: 46,
+    width: RECENTER_FAB_SIZE,
+    height: RECENTER_FAB_SIZE,
+  },
+  recenterFab: {
+    flex: 1,
     borderRadius: 14,
     borderWidth: 1,
     alignItems: 'center',
@@ -441,4 +479,10 @@ const styles = StyleSheet.create({
     elevation: 6,
   },
   fabPressed: { opacity: 0.85 },
+  cardWrap: {
+    position: 'absolute',
+    left: spacing.md,
+    right: CARD_RIGHT_OFFSET,
+    alignItems: 'flex-start',
+  },
 })

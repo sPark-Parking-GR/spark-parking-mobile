@@ -6,18 +6,10 @@ import { WebView, type WebViewMessageEvent } from 'react-native-webview'
 
 import { PIN_ANCHOR, PIN_SIZE, pinSvgMarkup } from './logo'
 import type { MapProps } from './types'
-import { useLanguage } from '../../i18n/LanguageProvider'
-import { formatDistance, formatMoney } from '../../lib/format'
-
-interface LeafletStrings {
-  detailsCta: string
-  directionsCta: string
-}
 
 function buildHtml(
   center: { lat: number; lng: number },
   colors: ThemeContextValue['colors'],
-  strings: LeafletStrings,
 ): string {
   return `<!DOCTYPE html>
 <html>
@@ -28,25 +20,6 @@ function buildHtml(
   <style>
     html, body, #map { margin: 0; padding: 0; height: 100%; width: 100%; background: ${colors.map}; }
     .pin { filter: drop-shadow(0 2px 4px rgba(0,0,0,.35)); line-height: 0; }
-    .leaflet-popup-content { margin: 10px 12px; }
-    .leaflet-popup-content-wrapper { border-radius: 14px; cursor: pointer;
-      background: ${colors.sheet}; color: ${colors.ink}; border: 1px solid ${colors.line};
-      box-shadow: 0 6px 20px rgba(0,0,0,.45); }
-    .leaflet-popup-tip { background: ${colors.sheet}; border: 1px solid ${colors.line}; box-shadow: none; }
-    .leaflet-popup-close-button { color: ${colors.muted} !important; }
-    .leaflet-popup-close-button:hover { color: ${colors.ink} !important; }
-    .tip { min-width: 200px; }
-    .tip__row { display: flex; align-items: flex-start; gap: 10px; }
-    .tip__info { flex: 1; min-width: 0; }
-    .tip__name { font: 700 16px system-ui, sans-serif; color: ${colors.ink}; }
-    .tip__addr { font-size: 12px; color: ${colors.muted}; margin: 2px 0 0; }
-    .tip__meta { font-size: 12px; color: ${colors.muted}; margin: 6px 0 6px; }
-    .tip__priceWrap { text-align: right; flex: none; }
-    .tip__price { font: 800 19px system-ui, sans-serif; color: ${colors.pri}; }
-    .tip__priceSub { font-size: 11px; color: ${colors.muted}; }
-    .tip__actions { display: flex; align-items: center; gap: 12px; margin-top: 6px; }
-    .tip__cta { font: 600 13px system-ui, sans-serif; color: ${colors.pri}; cursor: pointer; }
-    .tip__dir { border-left: 1px solid ${colors.line}; padding-left: 12px; }
     .user-dot { width: 18px; height: 18px; border-radius: 50%; background: ${colors.pri};
       border: 3px solid ${colors.surface}; box-shadow: 0 0 0 2px ${colors.priSoft}, 0 1px 4px rgba(0,0,0,.3);
       transform: translate(-50%, -50%); }
@@ -84,26 +57,17 @@ function buildHtml(
       if (userMarker) userMarker.setLatLng([lat, lng]);
       else userMarker = L.marker([lat, lng], { icon: icon, interactive: false, zIndexOffset: 1000 }).addTo(map);
     };
-    window.go = function (id) { post({ type: 'navigate', id: id }); };
-    window.dir = function (e, id) { e.stopPropagation(); post({ type: 'directions', id: id }); };
-    // Suppress the close handler while we programmatically center on a tapped spot.
+    // Suppress the gesture signal while we programmatically center on a tapped spot.
     var selecting = false;
     // ~1m: if the spot is already centered, skip the pan (and its refetch).
     var CENTER_EPS = 1e-5;
-    // Close the tooltip on any user-driven map movement (drag/zoom/resize).
-    map.on('movestart zoomstart resize', function () { if (!selecting) map.closePopup(); });
     // A user pan or zoom — not a scripted move — clears the location lock so the
     // locate button icon reverts to the no-dot state.
     map.on('movestart zoomstart', function () {
       if (!programmatic && !selecting) post({ type: 'gesture' });
     });
     map.on('moveend zoomend', function () { programmatic = false; });
-    // A tap on empty map collapses the sheet — but if a tooltip is open, that tap
-    // just closes the tooltip (popup still open at click time), so skip it.
-    var popupOpen = false;
-    map.on('popupopen', function () { popupOpen = true; });
-    map.on('popupclose', function () { popupOpen = false; });
-    map.on('click', function () { if (!popupOpen) post({ type: 'mappress' }); });
+    map.on('click', function () { post({ type: 'mappress' }); });
     function postRegion() {
       var b = map.getBounds();
       var c = b.getCenter();
@@ -125,24 +89,8 @@ function buildHtml(
         iconSize: PIN_SIZE, iconAnchor: PIN_ANCHOR
       });
     }
-    function popupHtml(it) {
-      return '<div class="tip">' +
-               '<div class="tip__row">' +
-                 '<div class="tip__info">' +
-                   '<div class="tip__name">' + it.name + '</div>' +
-                   '<div class="tip__addr">' + it.address + '</div>' +
-                   '<div class="tip__meta">' + it.meta + '</div>' +
-                 '</div>' +
-                 (it.price ? '<div class="tip__priceWrap"><div class="tip__price">' + it.price + '</div><div class="tip__priceSub">' + it.priceSub + '</div></div>' : '') +
-               '</div>' +
-               '<div class="tip__actions">' +
-                 '<div class="tip__cta" onclick="window.go(\\'' + it.id + '\\')">${strings.detailsCta} →</div>' +
-                 '<div class="tip__cta tip__dir" onclick="window.dir(event, \\'' + it.id + '\\')">↗ ${strings.directionsCta}</div>' +
-               '</div>' +
-             '</div>';
-    }
     // Persistent markers keyed by id. Refetch reconciles in place so the tapped
-    // marker (and its open tooltip) is never destroyed and re-created.
+    // marker is never destroyed and re-created.
     var markers = {};
     var clusterMarkers = {};
     function clearClusters() {
@@ -151,7 +99,6 @@ function buildHtml(
       });
     }
     function clearPoints() {
-      map.closePopup();
       Object.keys(markers).forEach(function (id) {
         layer.removeLayer(markers[id]); delete markers[id];
       });
@@ -168,23 +115,17 @@ function buildHtml(
         if (m) {
           m.setLatLng([it.lat, it.lng]);
           if (m._available !== it.available) { m.setIcon(makeIcon(it.available)); m._available = it.available; }
-          m.setPopupContent(popupHtml(it));
           return;
         }
         m = L.marker([it.lat, it.lng], { icon: makeIcon(it.available) }).addTo(layer);
         m._available = it.available;
-        m.bindPopup(popupHtml(it), { closeButton: false, autoClose: true, closeOnClick: true, autoPan: false });
         m.on('click', function () {
-          post({ type: 'spotpress' });
+          post({ type: 'spotpress', id: it.id });
           var ll = m.getLatLng();
           var c = map.getCenter();
-          if (Math.abs(c.lat - ll.lat) < CENTER_EPS && Math.abs(c.lng - ll.lng) < CENTER_EPS) {
-            m.openPopup();
-            return;
-          }
+          if (Math.abs(c.lat - ll.lat) < CENTER_EPS && Math.abs(c.lng - ll.lng) < CENTER_EPS) return;
           selecting = true;
           map.setView([ll.lat, ll.lng], map.getZoom(), { animate: true });
-          m.openPopup();
           map.once('moveend', function () { selecting = false; });
         });
         markers[it.id] = m;
@@ -236,45 +177,21 @@ export function LeafletMap({
   results,
   clusters,
   onClusterPress,
-  onMarkerPress,
-  onDirections,
   onRegionChange,
   onUserGesture,
   onMapPress,
   onSpotSelect,
 }: MapProps) {
   const { mode, colors } = useTheme()
-  const { t, locale } = useLanguage()
   const ref = useRef<WebView>(null)
-  // Only `mode`/`locale` (not `center`) are deps: center changes are pushed via
+  // Only `mode` (not `center`) is a dep: center changes are pushed via
   // `recenter()` post-mount, not by rebuilding the whole HTML document.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const html = useMemo(
-    () =>
-      buildHtml(center, colors, {
-        detailsCta: t('mapDetailsCta'),
-        directionsCta: t('mapDirectionsCta'),
-      }),
-    [mode, locale],
-  )
+  const html = useMemo(() => buildHtml(center, colors), [mode])
 
   const payload = useMemo(
-    () =>
-      results.map((r) => ({
-        id: r.id,
-        lat: r.lat,
-        lng: r.lng,
-        name: r.name,
-        address: r.address,
-        available: r.available,
-        meta:
-          (r.available ? t('badgeAvailable') : t('badgeFull')) +
-          ' · ' +
-          formatDistance(r.distanceMeters),
-        price: r.priceCents != null ? formatMoney(r.priceCents, locale, r.currency) : null,
-        priceSub: t('priceTotalSuffix'),
-      })),
-    [results, locale, t],
+    () => results.map((r) => ({ id: r.id, lat: r.lat, lng: r.lng, available: r.available })),
+    [results],
   )
 
   const clusterPayload = useMemo(
@@ -356,16 +273,12 @@ export function LeafletMap({
       } else if (msg.type === 'clusterpress' && msg.id) {
         const cluster = clusters.find((c) => c.id === msg.id)
         if (cluster) onClusterPress?.(cluster)
-      } else if (msg.type === 'navigate' && msg.id) {
-        onMarkerPress(msg.id)
-      } else if (msg.type === 'directions' && msg.id) {
-        onDirections(msg.id)
       } else if (msg.type === 'gesture') {
         onUserGesture?.()
       } else if (msg.type === 'mappress') {
         onMapPress()
-      } else if (msg.type === 'spotpress') {
-        onSpotSelect()
+      } else if (msg.type === 'spotpress' && msg.id) {
+        onSpotSelect(msg.id)
       } else if (
         msg.type === 'region' &&
         msg.lat != null &&
