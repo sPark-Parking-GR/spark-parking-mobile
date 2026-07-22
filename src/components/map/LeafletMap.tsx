@@ -10,7 +10,9 @@ import type { MapProps } from './types'
 function buildHtml(
   center: { lat: number; lng: number },
   colors: ThemeContextValue['colors'],
+  mode: ThemeContextValue['mode'],
 ): string {
+  const tileTheme = mode === 'dark' ? 'dark_all' : 'light_all'
   return `<!DOCTYPE html>
 <html>
 <head>
@@ -34,7 +36,7 @@ function buildHtml(
   <script>
     var DEFAULT_ZOOM = 14;
     var map = L.map('map', { zoomControl: false }).setView([${center.lat}, ${center.lng}], DEFAULT_ZOOM);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/${tileTheme}/{z}/{x}/{y}{r}.png', {
       attribution: '&copy; OpenStreetMap &copy; CARTO', subdomains: 'abcd', maxZoom: 20
     }).addTo(map);
     var layer = L.layerGroup().addTo(map);
@@ -204,7 +206,7 @@ export function LeafletMap({
   // Only `mode` (not `center`) is a dep: center changes are pushed via
   // `recenter()` post-mount, not by rebuilding the whole HTML document.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  const html = useMemo(() => buildHtml(center, colors), [mode])
+  const html = useMemo(() => buildHtml(center, colors, mode), [mode])
 
   const payload = useMemo(
     () => results.map((r) => ({ id: r.id, lat: r.lat, lng: r.lng, available: r.available })),

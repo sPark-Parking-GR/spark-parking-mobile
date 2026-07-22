@@ -45,7 +45,7 @@ export function NativeMap({
   onSpotSelect,
   getCenterOffsetPx,
 }: MapProps) {
-  const { colors } = useTheme()
+  const { mode, colors } = useTheme()
   const ref = useRef<MapView>(null)
   const { height: screenHeight } = useWindowDimensions()
 
@@ -104,8 +104,8 @@ export function NativeMap({
       initialRegion={region}
       showsUserLocation
       showsMyLocationButton={false}
-      customMapStyle={DARK_MAP_STYLE}
-      userInterfaceStyle="dark"
+      customMapStyle={mode === 'dark' ? DARK_MAP_STYLE : []}
+      userInterfaceStyle={mode}
       onRegionChangeComplete={handleRegion}
       onRegionChangeStart={(_region, details) => {
         if (details.isGesture) onUserGesture?.()
