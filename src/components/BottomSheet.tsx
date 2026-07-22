@@ -101,6 +101,10 @@ export function BottomSheet({
   const start = useSharedValue(peekY)
   const [expanded, setExpanded] = useState(false)
   const headerH = useSharedValue(0)
+  // 1 only once the sheet has settled at the full detent; drives the sort row's
+  // reveal so it appears after the half→full animation finishes, not during it.
+  const sortReveal = useSharedValue(0)
+  const sortH = useSharedValue(0)
 
   // 0 at peek → 1 from half-open upward. Drives the sort row + list clip below,
   // and (via expandProgress) the tab bar's label collapse in lockstep.
@@ -162,6 +166,20 @@ export function BottomSheet({
     return dO <= dH && dO <= dP ? openY : dH <= dP ? halfY : peekY
   }
 
+  // Snaps ty to dest, then reveals the sort row only after arriving at the
+  // partial detent or above. Collapsing to peek hides it immediately.
+  const settle = (dest: number) => {
+    'worklet'
+    if (dest <= halfY) {
+      ty.value = withTiming(dest, TIMING, (finished) => {
+        if (finished) sortReveal.value = withTiming(1, TIMING)
+      })
+    } else {
+      sortReveal.value = withTiming(0, TIMING)
+      ty.value = withTiming(dest, TIMING)
+    }
+  }
+
   const onScroll = useAnimatedScrollHandler((e) => {
     scrollY.value = e.contentOffset.y
     maxScroll.value = Math.max(0, e.contentSize.height - e.layoutMeasurement.height)
@@ -182,7 +200,7 @@ export function BottomSheet({
             ? halfY
             : peekY
           : snapTo(start.value, ty.value, e.velocityY)
-      ty.value = withTiming(dest, TIMING)
+      settle(dest)
       runOnJS(setExpandedJS)(dest)
     })
 
@@ -221,7 +239,7 @@ export function BottomSheet({
       if (!driving.value) return
       driving.value = false
       const dest = snapTo(start.value, ty.value, e.velocityY)
-      ty.value = withTiming(dest, TIMING)
+      settle(dest)
       runOnJS(setExpandedJS)(dest)
     })
     .simultaneousWithExternalGesture(listScroll)
@@ -229,6 +247,7 @@ export function BottomSheet({
   useEffect(() => {
     if (collapse === 0 || ty.value >= peekY - 1) return
     ty.value = withTiming(peekY, TIMING)
+    sortReveal.value = withTiming(0, TIMING)
     setExpanded(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collapse])
@@ -239,6 +258,13 @@ export function BottomSheet({
   // (count + swipe hint) is visible — no partial list content peeking through.
   const bodyClipStyle = useAnimatedStyle(() => ({
     height: (fullH - headerH.value) * progress.value,
+  }))
+
+  // Collapses the sort row's height and fades it in lockstep with sortReveal, so
+  // it only takes space and shows once the sheet has fully expanded.
+  const sortWrapStyle = useAnimatedStyle(() => ({
+    height: sortH.value * sortReveal.value,
+    opacity: sortReveal.value,
   }))
 
   const keyExtractor = useCallback((item: FacilitySearchResult) => item.id, [])
@@ -304,24 +330,31 @@ export function BottomSheet({
 
       <Animated.View style={[styles.contentClip, bodyClipStyle]}>
         {!error && (
-          <View style={styles.sortRow}>
-            <SegmentedControl
-              segments={sortSegments}
-              value={sortMode}
-              onChange={(v) => (v === 'cost' ? onSortCost() : onSortNearby())}
-            />
-            {sortMode === 'cost' && costLabel ? (
-              <Text
-                style={[
-                  styles.sortCaption,
-                  { fontSize: typography.caption.fontSize, color: colors.muted },
-                ]}
-                numberOfLines={1}
-              >
-                {costLabel}
-              </Text>
-            ) : null}
-          </View>
+          <Animated.View style={[styles.sortClip, sortWrapStyle]}>
+            <View
+              style={styles.sortRow}
+              onLayout={(e) => {
+                sortH.value = e.nativeEvent.layout.height
+              }}
+            >
+              <SegmentedControl
+                segments={sortSegments}
+                value={sortMode}
+                onChange={(v) => (v === 'cost' ? onSortCost() : onSortNearby())}
+              />
+              {sortMode === 'cost' && costLabel ? (
+                <Text
+                  style={[
+                    styles.sortCaption,
+                    { fontSize: typography.caption.fontSize, color: colors.muted },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {costLabel}
+                </Text>
+              ) : null}
+            </View>
+          </Animated.View>
         )}
 
         <GestureDetector gesture={Gesture.Simultaneous(listPan, listScroll)}>
@@ -384,6 +417,7 @@ const styles = StyleSheet.create({
   title: { fontWeight: '700', flexShrink: 1 },
   hint: { fontWeight: '600' },
   contentClip: { overflow: 'hidden' },
+  sortClip: { overflow: 'hidden' },
   sortRow: { paddingHorizontal: spacing.md, paddingBottom: spacing.sm, gap: 6 },
   sortCaption: { fontWeight: '600', paddingHorizontal: 2 },
   body: { flex: 1 },
