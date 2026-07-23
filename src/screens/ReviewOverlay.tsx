@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
 import { spacing, typography, useTheme } from '@spark/ui'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -8,13 +8,11 @@ import type { BookingValue } from '../components/BookingForm'
 import { Button, Card } from '../components/ui'
 import { useLanguage } from '../i18n/LanguageProvider'
 import type { PriceQuote } from '../lib/api'
+import { bookSpot, newIdempotencyKey } from '../lib/booking'
 import { vehicleLabel } from '../lib/constants'
 import { formatMoney, formatTimeRange } from '../lib/format'
+import { identity } from '../lib/identity'
 import { useOverlay } from '../navigation/OverlayContext'
-
-function generateCode(): string {
-  return `SPK-${Math.floor(1000 + Math.random() * 9000)}`
-}
 
 export function ReviewOverlay({
   facilityId,
@@ -34,6 +32,10 @@ export function ReviewOverlay({
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
 
+  const idempotencyKey = useMemo(() => newIdempotencyKey(), [])
+  const [submitting, setSubmitting] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
   const back = () => openFacilityDetail(facilityId, booking)
 
   useEffect(() => {
@@ -46,14 +48,36 @@ export function ReviewOverlay({
   }, [facilityId, booking])
 
   const confirm = () => {
-    openTicket({
-      facilityId,
-      facilityName,
-      code: generateCode(),
-      booking,
-      totalCents: quote.totalCents,
-      currency: quote.currency,
-    })
+    void handleConfirm()
+  }
+
+  async function handleConfirm() {
+    if (submitting) return
+    setSubmitting(true)
+    setError(null)
+    try {
+      const { code } = await bookSpot(
+        {
+          facilityId,
+          startsAt: booking.startsAt,
+          endsAt: booking.endsAt,
+          vehicleType: booking.vehicleType,
+          idempotencyKey,
+        },
+        identity,
+      )
+      openTicket({
+        facilityId,
+        facilityName,
+        code,
+        booking,
+        totalCents: quote.totalCents,
+        currency: quote.currency,
+      })
+    } catch {
+      setError(t('reviewError'))
+      setSubmitting(false)
+    }
   }
 
   const confirmLabel = `${t('reviewConfirm')} · ${formatMoney(quote.totalCents, locale, quote.currency)}`
@@ -136,7 +160,14 @@ export function ReviewOverlay({
           },
         ]}
       >
-        <Button label={confirmLabel} onPress={confirm} />
+        {error ? (
+          <Text style={[styles.error, { color: colors.bad }]}>{error}</Text>
+        ) : null}
+        <Button
+          label={submitting ? t('reviewBooking') : confirmLabel}
+          onPress={confirm}
+          loading={submitting}
+        />
       </View>
     </View>
   )
@@ -184,6 +215,11 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 16, fontWeight: '800' },
   totalValueCard: { fontSize: 20, fontWeight: '800' },
   muted: { fontSize: 12, marginTop: 2 },
+  error: {
+    fontSize: typography.body.fontSize,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
   footer: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
