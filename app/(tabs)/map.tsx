@@ -421,7 +421,7 @@ export default function MapScreen() {
             pressed && styles.fabPressed,
           ]}
         >
-          <MaterialIcons name="tune" size={19} color={colors.ink} />
+          <MaterialIcons name="filter-list" size={19} color={colors.ink} />
         </Pressable>
       </View>
 
