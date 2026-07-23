@@ -1,3 +1,5 @@
+import type { IdentityStrategy } from './identity'
+
 const BASE_URL = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://127.0.0.1:3001/api/v1'
 
 export interface FacilitySearchResult {
@@ -168,4 +170,57 @@ export function getQuote(
 ): Promise<PriceQuote> {
   const query = new URLSearchParams({ startsAt, endsAt, vehicleType })
   return request<PriceQuote>(`/facilities/${id}/quote?${query.toString()}`)
+}
+
+export interface CreateBookingInput {
+  facilityId: string
+  startsAt: string
+  endsAt: string
+  vehicleType: string
+  vehiclePlate: string
+  idempotencyKey: string
+}
+
+export interface BookingResult {
+  bookingId: string
+  accessCode: string
+  expiresAt: string
+  amountCents: number
+  currency: string
+  clientSecret?: string
+  alreadyExisted: boolean
+}
+
+export interface ConfirmedBooking {
+  bookingId: string
+  accessCode: string
+  status: string
+  startsAt: string
+  endsAt: string
+  finalPriceCents: number
+  currency: string
+}
+
+export async function createBooking(
+  input: CreateBookingInput,
+  identity: IdentityStrategy,
+): Promise<BookingResult> {
+  const body = {
+    facilityId: input.facilityId,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    vehicleType: input.vehicleType,
+    vehiclePlate: input.vehiclePlate,
+    sourceChannel: 'MOBILE' as const,
+    ...identity.bookingIdentity(),
+  }
+  return request<BookingResult>('/bookings', {
+    method: 'POST',
+    headers: { 'Idempotency-Key': input.idempotencyKey, ...(await identity.authHeaders()) },
+    body: JSON.stringify(body),
+  })
+}
+
+export function confirmBooking(bookingId: string): Promise<ConfirmedBooking> {
+  return request<ConfirmedBooking>(`/bookings/${bookingId}/confirm`, { method: 'POST' })
 }
