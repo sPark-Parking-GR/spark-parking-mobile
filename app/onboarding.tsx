@@ -47,7 +47,7 @@ export default function OnboardingScreen() {
   const { colors } = useTheme()
   const { t } = useLanguage()
   const insets = useSafeAreaInsets()
-  const { retry } = useUserLocation()
+  const { retry } = useUserLocation({ auto: false })
   const ring1Style = usePulseStyle(0)
   const ring2Style = usePulseStyle(RING2_DELAY)
   const [sceneSize, setSceneSize] = useState({ width: 0, height: 0 })
