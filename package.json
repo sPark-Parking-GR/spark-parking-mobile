@@ -9,7 +9,9 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "eas-build": "npx eas-cli build --profile development --platform android",
+    "eas-build-post-install": "cd ../.. && pnpm turbo run build --filter=@spark/mobile^..."
   },
   "dependencies": {
     "@expo/metro-runtime": "~6.1.2",
