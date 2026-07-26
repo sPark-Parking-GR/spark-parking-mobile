@@ -2,10 +2,13 @@ import type { IdentityStrategy } from './identity'
 
 const BASE_URL = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://127.0.0.1:3001/api/v1'
 
+export type FacilityKind = 'BUSINESS' | 'FREE_PUBLIC' | 'RESTRICTED' | 'UNKNOWN'
+
 export interface FacilitySearchResult {
   id: string
   name: string
   address: string
+  kind: FacilityKind
   lat: number
   lng: number
   distanceMeters: number
@@ -56,6 +59,7 @@ export interface FacilityDetail {
   id: string
   name: string
   address: string
+  kind: FacilityKind
   lat: number
   lng: number
   totalCapacity: number

@@ -234,7 +234,7 @@ export function FacilityDetailOverlay({
 
   // Recompute the price whenever the booking form changes.
   useEffect(() => {
-    if (!booking) return
+    if (!booking || !facility || facility.kind !== 'BUSINESS') return
     let cancelled = false
     setQuoteLoading(true)
     getQuote(facilityId, booking.startsAt, booking.endsAt, booking.vehicleType)
@@ -250,7 +250,7 @@ export function FacilityDetailOverlay({
     return () => {
       cancelled = true
     }
-  }, [facilityId, booking?.startsAt, booking?.endsAt, booking?.vehicleType])
+  }, [facilityId, facility, booking?.startsAt, booking?.endsAt, booking?.vehicleType])
 
   const heroButtons = (
     <View style={[styles.heroButtonRow, { marginTop: insets.top + spacing.sm }]}>
@@ -298,6 +298,8 @@ export function FacilityDetailOverlay({
     )
   }
 
+  const isBusiness = facility.kind === 'BUSINESS'
+
   const distanceLabel =
     coords != null ? formatDistance(computeDistanceMeters(coords, facility)) : null
 
@@ -331,134 +333,148 @@ export function FacilityDetailOverlay({
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
-        <Card style={[styles.card, styles.cardRadius]}>
-          <Text style={[styles.cardTitle, { color: colors.muted }]}>{t('amenitiesTitle')}</Text>
-          <View style={styles.wrap}>
-            {facility.amenities.map((a) => (
-              <Chip key={a} label={amenityLabel(a, t)} />
-            ))}
-            {facility.heightRestrictionCm ? (
-              <Chip
-                label={`${t('heightRestrictionPrefix')} ${facility.heightRestrictionCm}cm`}
-                warning
-              />
-            ) : null}
-          </View>
-          {facility.cancellationPolicy ? (
-            <Text style={[styles.policy, { color: colors.muted }]}>
-              {facility.cancellationPolicy}
+        {!isBusiness ? (
+          <Card style={[styles.card, styles.cardRadius]}>
+            <Text style={[styles.muted, { color: colors.muted }]}>
+              {t('facilityInfoOnlyNotice')}
             </Text>
-          ) : null}
-        </Card>
+          </Card>
+        ) : (
+          <>
+            <Card style={[styles.card, styles.cardRadius]}>
+              <Text style={[styles.cardTitle, { color: colors.muted }]}>{t('amenitiesTitle')}</Text>
+              <View style={styles.wrap}>
+                {facility.amenities.map((a) => (
+                  <Chip key={a} label={amenityLabel(a, t)} />
+                ))}
+                {facility.heightRestrictionCm ? (
+                  <Chip
+                    label={`${t('heightRestrictionPrefix')} ${facility.heightRestrictionCm}cm`}
+                    warning
+                  />
+                ) : null}
+              </View>
+              {facility.cancellationPolicy ? (
+                <Text style={[styles.policy, { color: colors.muted }]}>
+                  {facility.cancellationPolicy}
+                </Text>
+              ) : null}
+            </Card>
 
-        <Card style={[styles.card, styles.cardRadius]}>
-          <Text style={[styles.cardTitle, { color: colors.muted }]}>
-            {t('bookingDetailsTitle')}
-          </Text>
-          <Pressable
-            onPress={() =>
-              openTimePicker(booking ?? initialBooking ?? defaultBooking(), setBooking, false)
-            }
-            style={({ pressed }) => [
-              styles.pickRow,
-              styles.pickRowLast,
-              { backgroundColor: colors.card2, borderColor: colors.line },
-              pressed && styles.pickRowPressed,
-            ]}
-          >
-            <Ionicons name="time-outline" size={18} color={colors.pri} />
-            <View style={styles.pickTextCol}>
-              <Text style={[styles.pickLabel, { color: colors.muted }]}>
-                {t('bookingDuration')}
+            <Card style={[styles.card, styles.cardRadius]}>
+              <Text style={[styles.cardTitle, { color: colors.muted }]}>
+                {t('bookingDetailsTitle')}
               </Text>
-              <Text style={[styles.pickValue, { color: colors.ink }]}>
-                {booking
-                  ? formatTimeRange(booking.startsAt, booking.endsAt, locale)
-                  : t('bookingTapToSelect')}
-              </Text>
-            </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.muted} />
-          </Pressable>
-
-          <Text style={[styles.vehicleLabel, { color: colors.muted }]}>{t('bookingVehicle')}</Text>
-          <SegmentedControl
-            segments={vehicleSegments}
-            value={booking?.vehicleType ?? initialBooking?.vehicleType ?? 'CAR'}
-            onChange={setVehicleType}
-          />
-        </Card>
-
-        <Card style={[styles.card, styles.cardRadius]}>
-          <Text style={[styles.cardTitle, { color: colors.muted }]}>{t('priceTitle')}</Text>
-          {quote ? (
-            <>
-              <Text style={[styles.muted, { color: colors.muted }]}>
-                {formatTimeRange(quote.startsAt, quote.endsAt, locale)}
-              </Text>
-              <View style={[styles.divider, { backgroundColor: colors.line }]} />
-              {quote.lineItems.map((item, i) => (
-                <View key={i} style={styles.row}>
-                  <Text style={[styles.rowLabel, { color: colors.muted }]}>
-                    {item.label} × {item.quantity}
+              <Pressable
+                onPress={() =>
+                  openTimePicker(booking ?? initialBooking ?? defaultBooking(), setBooking, false)
+                }
+                style={({ pressed }) => [
+                  styles.pickRow,
+                  styles.pickRowLast,
+                  { backgroundColor: colors.card2, borderColor: colors.line },
+                  pressed && styles.pickRowPressed,
+                ]}
+              >
+                <Ionicons name="time-outline" size={18} color={colors.pri} />
+                <View style={styles.pickTextCol}>
+                  <Text style={[styles.pickLabel, { color: colors.muted }]}>
+                    {t('bookingDuration')}
                   </Text>
-                  <Text style={[styles.rowValue, { color: colors.ink }]}>
-                    {formatMoney(item.subtotalCents, locale, quote.currency)}
+                  <Text style={[styles.pickValue, { color: colors.ink }]}>
+                    {booking
+                      ? formatTimeRange(booking.startsAt, booking.endsAt, locale)
+                      : t('bookingTapToSelect')}
                   </Text>
                 </View>
-              ))}
-              <View style={[styles.divider, { backgroundColor: colors.line }]} />
-              <View style={styles.row}>
-                <Text style={[styles.totalLabel, { color: colors.ink }]}>{t('total')}</Text>
-                <Text style={[styles.totalValueCard, { color: colors.pri }]}>
-                  {formatMoney(quote.totalCents, locale, quote.currency)}
-                </Text>
-              </View>
-            </>
-          ) : quoteLoading ? (
-            <ActivityIndicator color={colors.pri} />
-          ) : (
-            <Text style={[styles.muted, { color: colors.muted }]}>{t('priceUnavailable')}</Text>
-          )}
-        </Card>
+                <Ionicons name="chevron-forward" size={16} color={colors.muted} />
+              </Pressable>
 
-        <PricingCard
-          assignments={facility.tariffAssignments}
-          vehicleType={booking?.vehicleType ?? 'CAR'}
-        />
+              <Text style={[styles.vehicleLabel, { color: colors.muted }]}>
+                {t('bookingVehicle')}
+              </Text>
+              <SegmentedControl
+                segments={vehicleSegments}
+                value={booking?.vehicleType ?? initialBooking?.vehicleType ?? 'CAR'}
+                onChange={setVehicleType}
+              />
+            </Card>
+
+            <Card style={[styles.card, styles.cardRadius]}>
+              <Text style={[styles.cardTitle, { color: colors.muted }]}>{t('priceTitle')}</Text>
+              {quote ? (
+                <>
+                  <Text style={[styles.muted, { color: colors.muted }]}>
+                    {formatTimeRange(quote.startsAt, quote.endsAt, locale)}
+                  </Text>
+                  <View style={[styles.divider, { backgroundColor: colors.line }]} />
+                  {quote.lineItems.map((item, i) => (
+                    <View key={i} style={styles.row}>
+                      <Text style={[styles.rowLabel, { color: colors.muted }]}>
+                        {item.label} × {item.quantity}
+                      </Text>
+                      <Text style={[styles.rowValue, { color: colors.ink }]}>
+                        {formatMoney(item.subtotalCents, locale, quote.currency)}
+                      </Text>
+                    </View>
+                  ))}
+                  <View style={[styles.divider, { backgroundColor: colors.line }]} />
+                  <View style={styles.row}>
+                    <Text style={[styles.totalLabel, { color: colors.ink }]}>{t('total')}</Text>
+                    <Text style={[styles.totalValueCard, { color: colors.pri }]}>
+                      {formatMoney(quote.totalCents, locale, quote.currency)}
+                    </Text>
+                  </View>
+                </>
+              ) : quoteLoading ? (
+                <ActivityIndicator color={colors.pri} />
+              ) : (
+                <Text style={[styles.muted, { color: colors.muted }]}>{t('priceUnavailable')}</Text>
+              )}
+            </Card>
+
+            <PricingCard
+              assignments={facility.tariffAssignments}
+              vehicleType={booking?.vehicleType ?? 'CAR'}
+            />
+          </>
+        )}
       </ScrollView>
 
-      <View
-        style={[
-          styles.footer,
-          {
-            paddingBottom: insets.bottom + spacing.md,
-            backgroundColor: colors.surface,
-            borderTopColor: colors.line,
-          },
-        ]}
-      >
-        {quote ? (
-          <View style={styles.footerTotal}>
-            <Text style={[styles.rowLabel, { color: colors.muted }]}>{t('total')}</Text>
-            <Text style={[styles.totalValue, { color: colors.ink }]}>
-              {formatMoney(quote.totalCents, locale, quote.currency)}
-            </Text>
+      {isBusiness ? (
+        <View
+          style={[
+            styles.footer,
+            {
+              paddingBottom: insets.bottom + spacing.md,
+              backgroundColor: colors.surface,
+              borderTopColor: colors.line,
+            },
+          ]}
+        >
+          {quote ? (
+            <View style={styles.footerTotal}>
+              <Text style={[styles.rowLabel, { color: colors.muted }]}>{t('total')}</Text>
+              <Text style={[styles.totalValue, { color: colors.ink }]}>
+                {formatMoney(quote.totalCents, locale, quote.currency)}
+              </Text>
+            </View>
+          ) : null}
+          <View style={styles.footerBtn}>
+            <Button
+              label={t('bookingBook')}
+              icon="arrow-forward"
+              iconPosition="trailing"
+              animateIcon
+              disabled={!booking || !quote}
+              onPress={() => {
+                if (!booking || !quote) return
+                openReview(facilityId, facility.name, facility.address, booking, quote)
+              }}
+            />
           </View>
-        ) : null}
-        <View style={styles.footerBtn}>
-          <Button
-            label={t('bookingBook')}
-            icon="arrow-forward"
-            iconPosition="trailing"
-            animateIcon
-            disabled={!booking || !quote}
-            onPress={() => {
-              if (!booking || !quote) return
-              openReview(facilityId, facility.name, facility.address, booking, quote)
-            }}
-          />
         </View>
-      </View>
+      ) : null}
     </View>
   )
 }

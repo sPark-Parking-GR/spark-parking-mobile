@@ -18,11 +18,14 @@ function FacilityCardBase({
 }) {
   const { colors } = useTheme()
   const { locale, t } = useLanguage()
-  const availability = !result.available
-    ? { label: t('badgeFull'), variant: 'error' as const }
-    : result.remainingSlots <= 5
-      ? { label: t('badgeLimited'), variant: 'warning' as const }
-      : { label: t('badgeAvailable'), variant: 'success' as const }
+  const isBusiness = result.kind === 'BUSINESS'
+  const availability = !isBusiness
+    ? { label: t('badgeInfoOnly'), variant: 'neutral' as const }
+    : !result.available
+      ? { label: t('badgeFull'), variant: 'error' as const }
+      : result.remainingSlots <= 5
+        ? { label: t('badgeLimited'), variant: 'warning' as const }
+        : { label: t('badgeAvailable'), variant: 'success' as const }
 
   return (
     <Pressable
@@ -60,14 +63,16 @@ function FacilityCardBase({
           </Text>
         </View>
       </View>
-      <View style={styles.right}>
-        <Text style={[styles.price, { color: colors.pri }]}>
-          {result.priceCents != null
-            ? formatMoney(result.priceCents, locale, result.currency)
-            : '—'}
-        </Text>
-        <Text style={[styles.priceLabel, { color: colors.muted }]}>{t('priceTotalSuffix')}</Text>
-      </View>
+      {isBusiness ? (
+        <View style={styles.right}>
+          <Text style={[styles.price, { color: colors.pri }]}>
+            {result.priceCents != null
+              ? formatMoney(result.priceCents, locale, result.currency)
+              : '—'}
+          </Text>
+          <Text style={[styles.priceLabel, { color: colors.muted }]}>{t('priceTotalSuffix')}</Text>
+        </View>
+      ) : null}
     </Pressable>
   )
 }
@@ -82,6 +87,7 @@ export const FacilityCard = memo(
     a.result.id === b.result.id &&
     a.result.name === b.result.name &&
     a.result.address === b.result.address &&
+    a.result.kind === b.result.kind &&
     a.result.available === b.result.available &&
     a.result.remainingSlots === b.result.remainingSlots &&
     a.result.distanceMeters === b.result.distanceMeters &&

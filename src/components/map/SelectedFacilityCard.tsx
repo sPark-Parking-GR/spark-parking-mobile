@@ -18,6 +18,7 @@ export function SelectedFacilityCard({
 }) {
   const { colors } = useTheme()
   const { t, locale } = useLanguage()
+  const isBusiness = facility.kind === 'BUSINESS'
 
   return (
     <View style={[styles.card, { backgroundColor: colors.sheet, borderColor: colors.line }]}>
@@ -25,7 +26,7 @@ export function SelectedFacilityCard({
         <Text style={[styles.name, { color: colors.ink }]} numberOfLines={1}>
           {facility.name}
         </Text>
-        {facility.priceCents != null ? (
+        {isBusiness && facility.priceCents != null ? (
           <Text style={[styles.price, { color: colors.pri }]}>
             {formatMoney(facility.priceCents, locale, facility.currency)}
           </Text>
@@ -35,10 +36,14 @@ export function SelectedFacilityCard({
         {facility.address}
       </Text>
       <View style={styles.metaRow}>
-        <Badge
-          label={facility.available ? t('badgeAvailable') : t('badgeFull')}
-          variant={facility.available ? 'success' : 'error'}
-        />
+        {isBusiness ? (
+          <Badge
+            label={facility.available ? t('badgeAvailable') : t('badgeFull')}
+            variant={facility.available ? 'success' : 'error'}
+          />
+        ) : (
+          <Badge label={t('badgeInfoOnly')} variant="neutral" />
+        )}
         <Text style={[styles.distance, { color: colors.muted }]}>
           {formatDistance(facility.distanceMeters)}
         </Text>
