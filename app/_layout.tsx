@@ -5,6 +5,7 @@ import type { ReactElement } from 'react'
 import { GestureHandlerRootView } from 'react-native-gesture-handler'
 import { SafeAreaProvider } from 'react-native-safe-area-context'
 
+import { AuthProvider } from '../src/auth/AuthProvider'
 import { LanguageProvider } from '../src/i18n/LanguageProvider'
 import { SavedFacilitiesProvider } from '../src/lib/savedFacilities'
 import { OverlayProvider } from '../src/navigation/OverlayContext'
@@ -43,11 +44,13 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <SafeAreaProvider>
             <ThemedStatusBar />
-            <SavedFacilitiesProvider>
-              <OverlayProvider>
-                <RootNavigator />
-              </OverlayProvider>
-            </SavedFacilitiesProvider>
+            <AuthProvider>
+              <SavedFacilitiesProvider>
+                <OverlayProvider>
+                  <RootNavigator />
+                </OverlayProvider>
+              </SavedFacilitiesProvider>
+            </AuthProvider>
           </SafeAreaProvider>
         </GestureHandlerRootView>
       </AppThemeProvider>

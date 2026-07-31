@@ -54,7 +54,7 @@ export function Button({
 }: {
   label: string
   onPress: () => void
-  variant?: 'primary' | 'secondary'
+  variant?: 'primary' | 'secondary' | 'danger'
   disabled?: boolean
   loading?: boolean
   icon?: keyof typeof Ionicons.glyphMap
@@ -63,6 +63,9 @@ export function Button({
 }) {
   const { colors } = useTheme()
   const isSecondary = variant === 'secondary'
+  // Flat and red, with none of the primary button's gradient or glow: a destructive
+  // action should not look like the one the screen wants you to take.
+  const isDanger = variant === 'danger'
   const fg = isSecondary ? colors.ink : '#fff'
   const iconOffset = useSharedValue(0)
   const iconAnimatedStyle = useAnimatedStyle(() => ({
@@ -94,12 +97,13 @@ export function Button({
         isSecondary
           ? { backgroundColor: 'transparent', borderColor: colors.line }
           : { borderColor: 'transparent' },
-        !isSecondary && !disabled && !loading && styles.btnGlow,
+        isDanger && { backgroundColor: colors.bad },
+        !isSecondary && !isDanger && !disabled && !loading && styles.btnGlow,
         pressed && !disabled && styles.btnPressed,
         (disabled || loading) && styles.btnDisabled,
       ]}
     >
-      {!isSecondary && (
+      {!isSecondary && !isDanger && (
         <View style={styles.btnGradientClip}>
           <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
             <Defs>

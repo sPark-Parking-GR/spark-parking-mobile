@@ -71,12 +71,7 @@ export default function SavedScreen() {
       <Text style={[styles.title, { color: colors.ink }]}>{t('savedTitle')}</Text>
       {saved.length === 0 ? (
         <View style={styles.empty}>
-          <Ionicons
-            name="star-outline"
-            size={40}
-            color={colors.faint}
-            style={styles.emptyIcon}
-          />
+          <Ionicons name="star-outline" size={40} color={colors.faint} style={styles.emptyIcon} />
           <Text style={[styles.emptyText, { color: colors.faint }]}>{t('savedEmpty')}</Text>
         </View>
       ) : (

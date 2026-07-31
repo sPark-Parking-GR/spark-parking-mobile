@@ -90,7 +90,7 @@ const styles = StyleSheet.create({
     // shadowOffset: { width: 0, height: 6 },
     elevation: 6,
     width: '100%',
-    height: "auto",
+    height: 'auto',
   },
   titleRow: {
     flexDirection: 'row',

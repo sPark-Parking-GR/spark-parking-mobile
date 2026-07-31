@@ -105,12 +105,8 @@ export default function OnboardingScreen() {
           />
         ))}
         <View style={styles.markWrap}>
-          <Animated.View
-            style={[styles.ringOuter, { backgroundColor: colors.pri }, ring1Style]}
-          />
-          <Animated.View
-            style={[styles.ringInner, { backgroundColor: colors.pri }, ring2Style]}
-          />
+          <Animated.View style={[styles.ringOuter, { backgroundColor: colors.pri }, ring1Style]} />
+          <Animated.View style={[styles.ringInner, { backgroundColor: colors.pri }, ring2Style]} />
           <View style={styles.logoShadow}>
             <LogoMark size={64} />
           </View>

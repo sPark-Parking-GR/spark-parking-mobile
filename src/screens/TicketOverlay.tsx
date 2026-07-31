@@ -78,7 +78,9 @@ export function TicketOverlay({
 
   return (
     <View style={[styles.root, { backgroundColor: colors.sheet }]}>
-      <View style={[styles.hero, { paddingTop: insets.top + spacing.xl, backgroundColor: colors.pri }]}>
+      <View
+        style={[styles.hero, { paddingTop: insets.top + spacing.xl, backgroundColor: colors.pri }]}
+      >
         <View style={styles.checkWrap}>
           <PulseRing delay={0} />
           <PulseRing delay={800} />

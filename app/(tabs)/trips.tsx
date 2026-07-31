@@ -34,7 +34,8 @@ export default function TripsScreen() {
             {item.facilityName}
           </Text>
           <Text style={[styles.recap, { color: colors.muted }]}>
-            {formatTimeRange(item.startsAt, item.endsAt, locale)} · {vehicleLabel(item.vehicleType, t)}
+            {formatTimeRange(item.startsAt, item.endsAt, locale)} ·{' '}
+            {vehicleLabel(item.vehicleType, t)}
           </Text>
           <View style={[styles.footerRow, { borderTopColor: colors.line }]}>
             <Text style={[styles.code, { color: colors.pri }]}>{item.code}</Text>

@@ -29,7 +29,11 @@ export function TimePickerOverlay({
 
   return (
     <>
-      <BookingForm initial={initial} onChange={setDraft} showVehicleSelector={showVehicleSelector} />
+      <BookingForm
+        initial={initial}
+        onChange={setDraft}
+        showVehicleSelector={showVehicleSelector}
+      />
       <Button
         label={t('bookingApply')}
         icon="checkmark"

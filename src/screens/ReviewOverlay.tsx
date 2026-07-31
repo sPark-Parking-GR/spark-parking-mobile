@@ -5,7 +5,7 @@ import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'reac
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import type { BookingValue } from '../components/BookingForm'
-import { Button, Card } from '../components/ui'
+import { Button, Card, Field } from '../components/ui'
 import { useLanguage } from '../i18n/LanguageProvider'
 import type { PriceQuote } from '../lib/api'
 import { bookSpot, newIdempotencyKey } from '../lib/booking'
@@ -13,6 +13,8 @@ import { vehicleLabel } from '../lib/constants'
 import { formatMoney, formatTimeRange } from '../lib/format'
 import { identity } from '../lib/identity'
 import { useOverlay } from '../navigation/OverlayContext'
+
+const PLATE_MAX = 16
 
 export function ReviewOverlay({
   facilityId,
@@ -27,12 +29,13 @@ export function ReviewOverlay({
   booking: BookingValue
   quote: PriceQuote
 }) {
-  const { openFacilityDetail, openTicket } = useOverlay()
+  const { openFacilityDetail, openTicket, openAuth } = useOverlay()
   const { t, locale } = useLanguage()
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
 
   const idempotencyKey = useMemo(() => newIdempotencyKey(), [])
+  const [vehiclePlate, setVehiclePlate] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -53,6 +56,28 @@ export function ReviewOverlay({
 
   async function handleConfirm() {
     if (submitting) return
+
+    const plate = vehiclePlate.trim()
+    if (!plate) {
+      setError(t('reviewPlateRequired'))
+      return
+    }
+
+    // The session can lapse between opening this screen and confirming (a refresh token
+    // that no longer refreshes). Send the user through sign-in and back to this exact
+    // booking rather than letting the request fail with a bare 401.
+    if (!identity.canBook()) {
+      openAuth('signIn', {
+        type: 'review',
+        facilityId,
+        facilityName,
+        facilityAddress,
+        booking,
+        quote,
+      })
+      return
+    }
+
     setSubmitting(true)
     setError(null)
     try {
@@ -62,6 +87,7 @@ export function ReviewOverlay({
           startsAt: booking.startsAt,
           endsAt: booking.endsAt,
           vehicleType: booking.vehicleType,
+          vehiclePlate: plate,
           idempotencyKey,
         },
         identity,
@@ -74,8 +100,8 @@ export function ReviewOverlay({
         totalCents: quote.totalCents,
         currency: quote.currency,
       })
-    } catch {
-      setError(t('reviewError'))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : t('reviewError'))
       setSubmitting(false)
     }
   }
@@ -120,6 +146,17 @@ export function ReviewOverlay({
               {vehicleLabel(booking.vehicleType, t)}
             </Text>
           </View>
+          <View style={[styles.divider, { marginVertical: 14, backgroundColor: colors.line }]} />
+          <Field
+            label={t('reviewVehiclePlate')}
+            value={vehiclePlate}
+            onChangeText={(next) => setVehiclePlate(next.toUpperCase())}
+            placeholder={t('reviewVehiclePlatePlaceholder')}
+            autoCapitalize="characters"
+            autoCorrect={false}
+            maxLength={PLATE_MAX}
+            editable={!submitting}
+          />
         </Card>
 
         <Card style={[styles.card, styles.cardRadius]}>
@@ -160,9 +197,7 @@ export function ReviewOverlay({
           },
         ]}
       >
-        {error ? (
-          <Text style={[styles.error, { color: colors.bad }]}>{error}</Text>
-        ) : null}
+        {error ? <Text style={[styles.error, { color: colors.bad }]}>{error}</Text> : null}
         <Button
           label={submitting ? t('reviewBooking') : confirmLabel}
           onPress={confirm}

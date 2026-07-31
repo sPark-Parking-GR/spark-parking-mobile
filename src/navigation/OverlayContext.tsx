@@ -3,7 +3,10 @@ import { createContext, useCallback, useContext, useMemo, useState } from 'react
 
 import type { BookingValue } from '../components/BookingForm'
 import type { PriceQuote } from '../lib/api'
+import { identity } from '../lib/identity'
 import { useTrips, type TripRecord } from '../lib/trips'
+
+export type AuthMode = 'signIn' | 'signUp' | 'forgotPassword'
 
 export type OverlayState =
   | { type: 'facilityDetail'; facilityId: string; booking?: BookingValue }
@@ -24,6 +27,10 @@ export type OverlayState =
       totalCents: number
       currency: string
     }
+  // `next` is where a successful sign-in lands and `back` where a cancel does — the two
+  // differ whenever auth was interposed: succeeding continues the booking, backing out
+  // returns to the screen the user tapped from.
+  | { type: 'auth'; mode: AuthMode; next: OverlayState; back: OverlayState }
   | null
 
 // Bottom-sheet overlays live in their own slot, independent of `overlay` — they
@@ -67,6 +74,9 @@ export interface OverlayContextValue {
     currency: string
   }) => void
   viewTicket: (trip: TripRecord) => void
+  openAuth: (mode: AuthMode, next?: OverlayState) => void
+  completeAuth: () => void
+  cancelAuth: () => void
   closeOverlay: () => void
   closeSheet: () => void
 }
@@ -83,11 +93,7 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
   }, [])
 
   const openTimePicker = useCallback(
-    (
-      initial: BookingValue,
-      onApply: (next: BookingValue) => void,
-      showVehicleSelector = true,
-    ) => {
+    (initial: BookingValue, onApply: (next: BookingValue) => void, showVehicleSelector = true) => {
       setSheet({ type: 'timePicker', initial, onApply, showVehicleSelector })
     },
     [],
@@ -95,6 +101,23 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
 
   const openFilters = useCallback(() => {
     setSheet({ type: 'filters' })
+  }, [])
+
+  const openAuth = useCallback((mode: AuthMode, next: OverlayState = null) => {
+    setOverlay((current) => ({
+      type: 'auth',
+      mode,
+      next,
+      back: current?.type === 'auth' ? current.back : current,
+    }))
+  }, [])
+
+  const completeAuth = useCallback(() => {
+    setOverlay((current) => (current?.type === 'auth' ? current.next : current))
+  }, [])
+
+  const cancelAuth = useCallback(() => {
+    setOverlay((current) => (current?.type === 'auth' ? current.back : current))
   }, [])
 
   const openReview = useCallback(
@@ -105,7 +128,21 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       booking: BookingValue,
       quote: PriceQuote,
     ) => {
-      setOverlay({ type: 'review', facilityId, facilityName, facilityAddress, booking, quote })
+      const review: OverlayState = {
+        type: 'review',
+        facilityId,
+        facilityName,
+        facilityAddress,
+        booking,
+        quote,
+      }
+      // The auth gate on booking. Interposing sign-in here rather than at the confirm
+      // button means the in-progress booking travels as `next` and the user lands back
+      // on it, instead of being dropped on the home screen. Asked of the strategy at tap
+      // time so a session that lapsed since the last render is caught too.
+      setOverlay((current) =>
+        identity.canBook() ? review : { type: 'auth', mode: 'signIn', next: review, back: current },
+      )
     },
     [],
   )
@@ -167,6 +204,9 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       openReview,
       openTicket,
       viewTicket,
+      openAuth,
+      completeAuth,
+      cancelAuth,
       closeOverlay,
       closeSheet,
     }),
@@ -180,6 +220,9 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       openReview,
       openTicket,
       viewTicket,
+      openAuth,
+      completeAuth,
+      cancelAuth,
       closeOverlay,
       closeSheet,
     ],

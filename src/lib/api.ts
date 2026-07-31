@@ -1,6 +1,5 @@
+import { ApiError, request } from './http'
 import type { IdentityStrategy } from './identity'
-
-const BASE_URL = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://127.0.0.1:3001/api/v1'
 
 export type FacilityKind = 'BUSINESS' | 'FREE_PUBLIC' | 'RESTRICTED' | 'UNKNOWN'
 
@@ -116,25 +115,27 @@ export interface SearchParams {
   vehicleType?: string
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const method = (init?.method ?? 'GET').toUpperCase()
-  const isWrite = method !== 'GET' && method !== 'HEAD'
-  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) }
+async function authedRequest<T>(
+  path: string,
+  init: RequestInit,
+  identity: IdentityStrategy,
+): Promise<T> {
+  const attempt = async (): Promise<T> =>
+    request<T>(path, {
+      ...init,
+      headers: { ...(init.headers as Record<string, string>), ...(await identity.authHeaders()) },
+    })
 
-  // React Native attaches an (empty) body to every POST, so a bodyless write
-  // reaches Fastify with content-type undefined → "Unsupported Media Type".
-  // Always send a valid JSON body for writes.
-  const body = isWrite ? (init?.body ?? '{}') : init?.body
-  if (body != null) headers['Content-Type'] = 'application/json'
-
-  const response = await fetch(`${BASE_URL}${path}`, { ...init, method, headers, body })
-
-  if (!response.ok) {
-    const errBody = (await response.json().catch(() => ({}))) as { message?: string }
-    throw new Error(errBody.message ?? `Request failed: ${response.status}`)
+  try {
+    return await attempt()
+  } catch (error) {
+    // Exactly one retry, and only for 401: the access token expired between the
+    // proactive freshness check and the request landing. A false here means the refresh
+    // token is gone too, so retrying could never succeed.
+    if (!(error instanceof ApiError) || error.status !== 401) throw error
+    if (!(await identity.recoverFromUnauthorized())) throw error
+    return attempt()
   }
-
-  return response.json() as Promise<T>
 }
 
 export function searchFacilities(
@@ -205,7 +206,7 @@ export interface ConfirmedBooking {
   currency: string
 }
 
-export async function createBooking(
+export function createBooking(
   input: CreateBookingInput,
   identity: IdentityStrategy,
 ): Promise<BookingResult> {
@@ -216,15 +217,25 @@ export async function createBooking(
     vehicleType: input.vehicleType,
     vehiclePlate: input.vehiclePlate,
     sourceChannel: 'MOBILE' as const,
-    ...identity.bookingIdentity(),
   }
-  return request<BookingResult>('/bookings', {
-    method: 'POST',
-    headers: { 'Idempotency-Key': input.idempotencyKey, ...(await identity.authHeaders()) },
-    body: JSON.stringify(body),
-  })
+  return authedRequest<BookingResult>(
+    '/bookings',
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': input.idempotencyKey },
+      body: JSON.stringify(body),
+    },
+    identity,
+  )
 }
 
-export function confirmBooking(bookingId: string): Promise<ConfirmedBooking> {
-  return request<ConfirmedBooking>(`/bookings/${bookingId}/confirm`, { method: 'POST' })
+export function confirmBooking(
+  bookingId: string,
+  identity: IdentityStrategy,
+): Promise<ConfirmedBooking> {
+  return authedRequest<ConfirmedBooking>(
+    `/bookings/${bookingId}/confirm`,
+    { method: 'POST' },
+    identity,
+  )
 }

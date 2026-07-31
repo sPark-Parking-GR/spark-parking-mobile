@@ -20,6 +20,7 @@ import { useLanguage } from '../../src/i18n/LanguageProvider'
 import { TAB_BAR_GAP, TAB_BAR_HEIGHT } from '../../src/lib/constants'
 import { useOverlay } from '../../src/navigation/OverlayContext'
 import { SheetExpandContext, useSheetExpandProgress } from '../../src/navigation/SheetExpandContext'
+import { AuthOverlay } from '../../src/screens/AuthOverlay'
 import { FacilityDetailOverlay } from '../../src/screens/FacilityDetailOverlay'
 import { FiltersOverlay } from '../../src/screens/FiltersOverlay'
 import { ReviewOverlay } from '../../src/screens/ReviewOverlay'
@@ -230,7 +231,11 @@ export default function TabsLayout() {
             options={{
               title: t('navTrips'),
               tabBarIcon: ({ focused, color, size }) => (
-                <Ionicons name={focused ? 'receipt' : 'receipt-outline'} color={color} size={size} />
+                <Ionicons
+                  name={focused ? 'receipt' : 'receipt-outline'}
+                  color={color}
+                  size={size}
+                />
               ),
             }}
           />
@@ -260,6 +265,12 @@ export default function TabsLayout() {
               booking={overlay.booking}
               quote={overlay.quote}
             />
+          </View>
+        )}
+
+        {overlay?.type === 'auth' && (
+          <View style={styles.overlay}>
+            <AuthOverlay mode={overlay.mode} />
           </View>
         )}
 
@@ -311,8 +322,8 @@ const styles = StyleSheet.create({
     shadowRadius: 24,
     elevation: 12,
   },
-  tabBarRow: { flex: 1, flexDirection: 'row', },
-  buttonInner: { flex: 1, alignItems: 'center', justifyContent: 'center',},
+  tabBarRow: { flex: 1, flexDirection: 'row' },
+  buttonInner: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   tabLabel: {
     fontSize: 10,
     fontWeight: '700',
