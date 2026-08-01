@@ -10,6 +10,7 @@
     "ios": "expo run:ios",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
+    "test": "jest",
     "eas-build": "npx eas-cli build --profile development --platform android",
     "eas-build-post-install": "cd ../.. && pnpm turbo run build --filter=@spark/mobile^..."
   },
@@ -52,12 +53,17 @@
     "@babel/core": "^7.25.2",
     "@react-navigation/bottom-tabs": "^7.18.2",
     "@spark/config": "workspace:*",
+    "@testing-library/react-native": "^13.3.3",
+    "@types/jest": "^29.5.14",
     "@types/react": "19.1.17",
     "@typescript-eslint/eslint-plugin": "^7.18.0",
     "@typescript-eslint/parser": "^7.18.0",
     "eslint": "^8.57.1",
     "eslint-config-prettier": "^9.1.0",
     "eslint-config-universe": "^13.0.0",
+    "jest": "^29.7.0",
+    "jest-expo": "^57.0.3",
+    "react-test-renderer": "19.1.0",
     "typescript": "^5.9.3"
   }
 }
