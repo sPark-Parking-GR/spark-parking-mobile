@@ -1,5 +1,5 @@
 import { Badge, Card, spacing, typography, useTheme } from '@spark/ui'
-import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { useLanguage } from '../../src/i18n/LanguageProvider'
@@ -11,20 +11,27 @@ import { useOverlay } from '../../src/navigation/OverlayContext'
 export default function TripsScreen() {
   const { colors } = useTheme()
   const { t, locale } = useLanguage()
-  const { trips, openFacilityDetail, viewTicket } = useOverlay()
+  const { trips, tripsRefreshing, refreshTrips, openFacilityDetail, viewTicket } = useOverlay()
   const insets = useSafeAreaInsets()
   const barOffset = tabBarFloatOffset(insets.bottom)
+
+  const onRefresh = () => {
+    refreshTrips().catch(() => undefined)
+  }
 
   const sorted = [...trips].sort((a, b) => b.confirmedAt.localeCompare(a.confirmedAt))
 
   const renderItem = ({ item }: { item: TripRecord }) => {
-    const isActive = new Date(item.endsAt) > new Date()
+    // A cancelled booking can still be in date, so status wins over the window when the
+    // server has told us one; records cached before the field existed fall back to it.
+    const isCancelled = item.status === 'CANCELLED'
+    const isActive = !isCancelled && new Date(item.endsAt) > new Date()
     return (
       <Pressable onPress={() => viewTicket(item)}>
         <Card padding={16} style={styles.card}>
           <View style={styles.headerRow}>
-            <Badge variant={isActive ? 'ok' : 'neutral'}>
-              {isActive ? t('tripsActive') : t('tripsPast')}
+            <Badge variant={isCancelled ? 'bad' : isActive ? 'ok' : 'neutral'}>
+              {isCancelled ? t('tripsCancelled') : isActive ? t('tripsActive') : t('tripsPast')}
             </Badge>
             <Text style={[styles.price, { color: colors.ink }]}>
               {formatMoney(item.totalCents, locale, item.currency)}
@@ -60,8 +67,15 @@ export default function TripsScreen() {
       ) : (
         <FlatList
           data={sorted}
-          keyExtractor={(item) => `${item.code}-${item.confirmedAt}`}
+          keyExtractor={(item) => item.bookingId}
           renderItem={renderItem}
+          refreshControl={
+            <RefreshControl
+              refreshing={tripsRefreshing}
+              onRefresh={onRefresh}
+              tintColor={colors.muted}
+            />
+          }
           contentContainerStyle={[styles.list, { paddingBottom: spacing.md + barOffset }]}
         />
       )}

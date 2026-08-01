@@ -20,6 +20,7 @@ export type OverlayState =
     }
   | {
       type: 'ticket'
+      bookingId: string
       facilityId: string
       facilityName: string
       code: string
@@ -51,6 +52,8 @@ export interface OverlayContextValue {
   overlay: OverlayState
   sheet: SheetState
   trips: TripRecord[]
+  tripsRefreshing: boolean
+  refreshTrips: () => Promise<void>
   openFacilityDetail: (facilityId: string, booking?: BookingValue) => void
   openTimePicker: (
     initial: BookingValue,
@@ -66,6 +69,7 @@ export interface OverlayContextValue {
     quote: PriceQuote,
   ) => void
   openTicket: (args: {
+    bookingId: string
     facilityId: string
     facilityName: string
     code: string
@@ -86,7 +90,7 @@ const OverlayContext = createContext<OverlayContextValue | null>(null)
 export function OverlayProvider({ children }: { children: ReactNode }): ReactElement {
   const [overlay, setOverlay] = useState<OverlayState>(null)
   const [sheet, setSheet] = useState<SheetState>(null)
-  const { trips, addTrip } = useTrips()
+  const { trips, refreshing: tripsRefreshing, addTrip, refreshTrips } = useTrips()
 
   const openFacilityDetail = useCallback((facilityId: string, booking?: BookingValue) => {
     setOverlay({ type: 'facilityDetail', facilityId, booking })
@@ -149,6 +153,7 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
 
   const openTicket = useCallback(
     (args: {
+      bookingId: string
       facilityId: string
       facilityName: string
       code: string
@@ -157,7 +162,10 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       currency: string
     }) => {
       setOverlay({ type: 'ticket', ...args })
+      // Written locally the moment the booking confirms so the ticket survives closing the
+      // app before the next server refresh, and shows offline.
       const trip: TripRecord = {
+        bookingId: args.bookingId,
         facilityId: args.facilityId,
         facilityName: args.facilityName,
         code: args.code,
@@ -167,6 +175,7 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
         totalCents: args.totalCents,
         currency: args.currency,
         confirmedAt: new Date().toISOString(),
+        status: 'CONFIRMED',
       }
       addTrip(trip)
     },
@@ -176,6 +185,7 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
   const viewTicket = useCallback((trip: TripRecord) => {
     setOverlay({
       type: 'ticket',
+      bookingId: trip.bookingId,
       facilityId: trip.facilityId,
       facilityName: trip.facilityName,
       code: trip.code,
@@ -198,6 +208,8 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       overlay,
       sheet,
       trips,
+      tripsRefreshing,
+      refreshTrips,
       openFacilityDetail,
       openTimePicker,
       openFilters,
@@ -214,6 +226,8 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       overlay,
       sheet,
       trips,
+      tripsRefreshing,
+      refreshTrips,
       openFacilityDetail,
       openTimePicker,
       openFilters,

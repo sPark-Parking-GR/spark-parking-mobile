@@ -277,6 +277,7 @@ export default function TabsLayout() {
         {overlay?.type === 'ticket' && (
           <View style={styles.overlay}>
             <TicketOverlay
+              bookingId={overlay.bookingId}
               facilityName={overlay.facilityName}
               code={overlay.code}
               booking={overlay.booking}

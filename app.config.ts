@@ -13,5 +13,13 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
         androidGoogleMapsApiKey: googleMapsApiKey,
       },
     ],
+    [
+      '@stripe/stripe-react-native',
+      {
+        // Must match the Apple Pay merchant ID registered on the Apple developer account.
+        merchantIdentifier: 'merchant.com.spark.app',
+        enableGooglePay: true,
+      },
+    ],
   ],
 })

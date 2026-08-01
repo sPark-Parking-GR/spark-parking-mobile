@@ -264,7 +264,14 @@ export function FacilityDetailOverlay({
       <Pressable
         onPress={() => {
           if (!facility) return
-          toggleSaved({ id: facilityId, name: facility.name, address: facility.address })
+          // Reachable enough for its detail page to have loaded, which is the same
+          // predicate the server applies before it will accept the bookmark at all.
+          toggleSaved({
+            id: facilityId,
+            name: facility.name,
+            address: facility.address,
+            available: true,
+          })
         }}
         style={({ pressed }) => [styles.iconBackdrop, pressed && styles.iconBackdropPressed]}
         hitSlop={12}

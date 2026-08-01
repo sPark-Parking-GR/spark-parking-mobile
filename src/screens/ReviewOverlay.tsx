@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
 import { spacing, typography, useTheme } from '@spark/ui'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -8,13 +8,17 @@ import type { BookingValue } from '../components/BookingForm'
 import { Button, Card, Field } from '../components/ui'
 import { useLanguage } from '../i18n/LanguageProvider'
 import type { PriceQuote } from '../lib/api'
-import { bookSpot, newIdempotencyKey } from '../lib/booking'
+import type { HeldBooking } from '../lib/booking'
+import { holdBooking, holdIsLive, newIdempotencyKey, settleBooking } from '../lib/booking'
 import { vehicleLabel } from '../lib/constants'
-import { formatMoney, formatTimeRange } from '../lib/format'
+import { formatDateTime, formatMoney, formatTimeRange } from '../lib/format'
 import { identity } from '../lib/identity'
+import { collectPayment } from '../lib/payments'
 import { useOverlay } from '../navigation/OverlayContext'
 
 const PLATE_MAX = 16
+
+type Phase = 'idle' | 'holding' | 'paying' | 'confirming'
 
 export function ReviewOverlay({
   facilityId,
@@ -34,10 +38,23 @@ export function ReviewOverlay({
   const { colors } = useTheme()
   const insets = useSafeAreaInsets()
 
-  const idempotencyKey = useMemo(() => newIdempotencyKey(), [])
+  // One key for the whole checkout, not one per attempt: `POST /bookings` is idempotent on
+  // it, so a retry after a dismissed sheet replays the original hold instead of holding a
+  // second slot and opening a second PaymentIntent.
+  const idempotencyKey = useRef(newIdempotencyKey())
+  // Kept in a ref, never in state or storage: the client secret is a payment credential
+  // and must not be logged, persisted or serialised into a navigation param.
+  const held = useRef<HeldBooking | null>(null)
+  // A ref, not the `phase` state: two taps landing in the same frame both read the
+  // pre-render value and would each start a checkout.
+  const inFlight = useRef(false)
+
   const [vehiclePlate, setVehiclePlate] = useState('')
-  const [submitting, setSubmitting] = useState(false)
+  const [phase, setPhase] = useState<Phase>('idle')
   const [error, setError] = useState<string | null>(null)
+  const [notice, setNotice] = useState<string | null>(null)
+
+  const submitting = phase !== 'idle'
 
   const back = () => openFacilityDetail(facilityId, booking)
 
@@ -55,7 +72,7 @@ export function ReviewOverlay({
   }
 
   async function handleConfirm() {
-    if (submitting) return
+    if (inFlight.current) return
 
     const plate = vehiclePlate.trim()
     if (!plate) {
@@ -78,32 +95,76 @@ export function ReviewOverlay({
       return
     }
 
-    setSubmitting(true)
     setError(null)
+    setNotice(null)
+    inFlight.current = true
+
     try {
-      const { code } = await bookSpot(
-        {
-          facilityId,
-          startsAt: booking.startsAt,
-          endsAt: booking.endsAt,
-          vehicleType: booking.vehicleType,
-          vehiclePlate: plate,
-          idempotencyKey,
-        },
-        identity,
-      )
+      // An expired hold can never be confirmed, and replaying its key would only return
+      // the same dead booking — so that is the one case that earns a fresh key.
+      if (held.current && !holdIsLive(held.current)) {
+        held.current = null
+        idempotencyKey.current = newIdempotencyKey()
+      }
+
+      setPhase('holding')
+      const hold =
+        held.current ??
+        (await holdBooking(
+          {
+            facilityId,
+            startsAt: booking.startsAt,
+            endsAt: booking.endsAt,
+            vehicleType: booking.vehicleType,
+            vehiclePlate: plate,
+            idempotencyKey: idempotencyKey.current,
+          },
+          identity,
+        ))
+      held.current = hold
+
+      if (hold.clientSecret) {
+        setPhase('paying')
+        const outcome = await collectPayment({
+          clientSecret: hold.clientSecret,
+          currency: hold.currency,
+        })
+
+        if (outcome.status !== 'paid') {
+          // Nothing was charged in any of these branches. The hold stays live, so the
+          // screen stays on the same booking and Confirm resumes it.
+          if (outcome.status === 'cancelled') setNotice(t('paymentCancelled'))
+          else if (outcome.status === 'unavailable') setError(t('paymentUnavailable'))
+          else setError(outcome.message || t('paymentFailed'))
+          setPhase('idle')
+          return
+        }
+      }
+
+      setPhase('confirming')
+      const confirmed = await settleBooking(hold.bookingId, identity)
+
       openTicket({
+        bookingId: hold.bookingId,
         facilityId,
         facilityName,
-        code,
+        code: confirmed.accessCode,
         booking,
-        totalCents: quote.totalCents,
-        currency: quote.currency,
+        totalCents: confirmed.finalPriceCents,
+        currency: confirmed.currency,
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : t('reviewError'))
-      setSubmitting(false)
+      setPhase('idle')
+    } finally {
+      inFlight.current = false
     }
+  }
+
+  function busyLabel(): string {
+    if (phase === 'paying') return t('reviewPaying')
+    if (phase === 'confirming') return t('reviewBooking')
+    return t('reviewPreparingPayment')
   }
 
   const confirmLabel = `${t('reviewConfirm')} · ${formatMoney(quote.totalCents, locale, quote.currency)}`
@@ -163,7 +224,7 @@ export function ReviewOverlay({
           <Text style={[styles.cardTitle, { color: colors.muted }]}>
             {t('reviewPaymentMethod')}
           </Text>
-          <Text style={[styles.muted, { color: colors.muted }]}>{t('reviewNoPaymentMethod')}</Text>
+          <Text style={[styles.muted, { color: colors.muted }]}>{t('reviewPaymentSheetHint')}</Text>
         </Card>
 
         <Card style={[styles.card, styles.cardRadius]}>
@@ -198,8 +259,18 @@ export function ReviewOverlay({
         ]}
       >
         {error ? <Text style={[styles.error, { color: colors.bad }]}>{error}</Text> : null}
+        {notice ? (
+          <View style={styles.notice}>
+            <Text style={[styles.error, styles.noticeText, { color: colors.ink }]}>{notice}</Text>
+            {held.current ? (
+              <Text style={[styles.holdUntil, { color: colors.muted }]}>
+                {t('paymentHoldUntil')} {formatDateTime(held.current.expiresAt, locale)}
+              </Text>
+            ) : null}
+          </View>
+        ) : null}
         <Button
-          label={submitting ? t('reviewBooking') : confirmLabel}
+          label={submitting ? busyLabel() : confirmLabel}
           onPress={confirm}
           loading={submitting}
         />
@@ -252,6 +323,13 @@ const styles = StyleSheet.create({
   muted: { fontSize: 12, marginTop: 2 },
   error: {
     fontSize: typography.body.fontSize,
+    textAlign: 'center',
+    marginBottom: spacing.sm,
+  },
+  notice: { marginBottom: spacing.xs },
+  noticeText: { marginBottom: 2, fontWeight: '600' },
+  holdUntil: {
+    fontSize: typography.caption.fontSize,
     textAlign: 'center',
     marginBottom: spacing.sm,
   },

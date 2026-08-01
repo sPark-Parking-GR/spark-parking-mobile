@@ -1,4 +1,6 @@
-import { ApiError, request } from './http'
+import { z } from 'zod'
+
+import { ApiError, request, requestNoContent } from './http'
 import type { IdentityStrategy } from './identity'
 
 export type FacilityKind = 'BUSINESS' | 'FREE_PUBLIC' | 'RESTRICTED' | 'UNKNOWN'
@@ -115,27 +117,36 @@ export interface SearchParams {
   vehicleType?: string
 }
 
-async function authedRequest<T>(
-  path: string,
-  init: RequestInit,
+async function withAuthRetry<T>(
   identity: IdentityStrategy,
+  send: (authHeaders: Record<string, string>) => Promise<T>,
 ): Promise<T> {
-  const attempt = async (): Promise<T> =>
-    request<T>(path, {
-      ...init,
-      headers: { ...(init.headers as Record<string, string>), ...(await identity.authHeaders()) },
-    })
-
   try {
-    return await attempt()
+    return await send(await identity.authHeaders())
   } catch (error) {
     // Exactly one retry, and only for 401: the access token expired between the
     // proactive freshness check and the request landing. A false here means the refresh
     // token is gone too, so retrying could never succeed.
     if (!(error instanceof ApiError) || error.status !== 401) throw error
     if (!(await identity.recoverFromUnauthorized())) throw error
-    return attempt()
+    return send(await identity.authHeaders())
   }
+}
+
+function withAuth(init: RequestInit, authHeaders: Record<string, string>): RequestInit {
+  return { ...init, headers: { ...(init.headers as Record<string, string>), ...authHeaders } }
+}
+
+function authedRequest<T>(path: string, init: RequestInit, identity: IdentityStrategy): Promise<T> {
+  return withAuthRetry(identity, (auth) => request<T>(path, withAuth(init, auth)))
+}
+
+function authedNoContent(
+  path: string,
+  init: RequestInit,
+  identity: IdentityStrategy,
+): Promise<void> {
+  return withAuthRetry(identity, (auth) => requestNoContent(path, withAuth(init, auth)))
 }
 
 export function searchFacilities(
@@ -238,4 +249,106 @@ export function confirmBooking(
     { method: 'POST' },
     identity,
   )
+}
+
+/*
+ * The account-scoped read/write seam behind the trips and saved-facility caches. These
+ * four calls are the whole contract with the server: shapes are parsed rather than cast,
+ * so a route that is not deployed yet, or that answers in a different shape, surfaces as
+ * a rejection the caller already handles by falling back to its local cache.
+ */
+
+const MY_BOOKINGS_PAGE = 50
+
+const myBookingSchema = z.object({
+  id: z.string().min(1),
+  accessCode: z.string().min(1),
+  status: z.string().min(1),
+  startsAt: z.string().min(1),
+  endsAt: z.string().min(1),
+  vehicleType: z.string().min(1),
+  quotedPriceCents: z.number(),
+  finalPriceCents: z.number().nullable().optional(),
+  currency: z.string().min(1),
+  facility: z.object({ id: z.string().min(1), name: z.string() }),
+  createdAt: z.string().min(1),
+})
+
+export type MyBooking = z.infer<typeof myBookingSchema>
+
+const myBookingsSchema = z.object({ items: z.array(myBookingSchema) })
+
+// `facilityId`, not `id`: the row is the bookmark, and the endpoint keeps archived
+// bookmarks in the list carrying `available: false` instead of dropping them, so the
+// client — not the server — decides what an unreachable saved spot looks like.
+const savedFacilitySchema = z.object({
+  facilityId: z.string().min(1),
+  name: z.string(),
+  address: z.string(),
+  available: z.boolean(),
+})
+
+export type RemoteSavedFacility = z.infer<typeof savedFacilitySchema>
+
+const savedListSchema = z.object({ items: z.array(savedFacilitySchema) })
+
+export async function listMyBookings(identity: IdentityStrategy): Promise<MyBooking[]> {
+  const body = await authedRequest<unknown>(
+    `/bookings/mine?skip=0&take=${MY_BOOKINGS_PAGE}`,
+    { method: 'GET' },
+    identity,
+  )
+  return myBookingsSchema.parse(body).items
+}
+
+export async function listSavedFacilities(
+  identity: IdentityStrategy,
+): Promise<RemoteSavedFacility[]> {
+  const body = await authedRequest<unknown>('/saved-facilities', { method: 'GET' }, identity)
+  return savedListSchema.parse(body).items
+}
+
+export function saveFacility(facilityId: string, identity: IdentityStrategy): Promise<void> {
+  return authedNoContent(
+    '/saved-facilities',
+    { method: 'POST', body: JSON.stringify({ facilityId }) },
+    identity,
+  )
+}
+
+export function unsaveFacility(facilityId: string, identity: IdentityStrategy): Promise<void> {
+  return authedNoContent(`/saved-facilities/${facilityId}`, { method: 'DELETE' }, identity)
+}
+
+const issuedTicketSchema = z.object({
+  bookingId: z.string().min(1),
+  payload: z.string().min(1),
+  unixMinute: z.number().int(),
+  expiresAt: z.string().min(1),
+})
+
+export type IssuedTicket = z.infer<typeof issuedTicketSchema>
+
+/**
+ * The owner's rotating barrier code. The signing secret never leaves the server, so every
+ * payload is minted per request and stops being accepted a few minutes later — see
+ * RotatingQr for the polling that keeps one on screen.
+ */
+export async function getBookingQr(
+  bookingId: string,
+  identity: IdentityStrategy,
+): Promise<IssuedTicket> {
+  const body = await authedRequest<unknown>(
+    `/bookings/${bookingId}/qr`,
+    { method: 'GET' },
+    identity,
+  )
+
+  // Reported as a server fault rather than the raw ZodError, because the ticket screen
+  // reads "not an ApiError" as "the device is offline" — which a reachable server
+  // answering in the wrong shape is not.
+  const parsed = issuedTicketSchema.safeParse(body)
+  if (!parsed.success) throw new ApiError('Malformed ticket response', 502)
+
+  return parsed.data
 }

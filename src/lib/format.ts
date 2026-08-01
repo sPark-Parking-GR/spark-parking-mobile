@@ -53,3 +53,9 @@ export function formatDateTimeShort(iso: string, locale: Locale): string {
 export function formatTimeRange(startIso: string, endIso: string, locale: Locale): string {
   return `${formatDateTime(startIso, locale)} → ${formatDateTime(endIso, locale)}`
 }
+
+// Grouped for dictation: operators read access codes down the phone when a scanner is
+// dead, and 26 unbroken characters is where that goes wrong.
+export function formatAccessCode(code: string): string {
+  return (code.match(/.{1,4}/g) ?? [code]).join(' ')
+}

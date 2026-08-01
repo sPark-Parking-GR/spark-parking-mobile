@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
-import { spacing, typography, useTheme } from '@spark/ui'
+import { Badge, spacing, typography, useTheme } from '@spark/ui'
 import { useFocusEffect } from 'expo-router'
 import { useCallback } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
@@ -21,10 +21,19 @@ function SavedFacilityRow({
   onPress: (id: string) => void
 }) {
   const { colors } = useTheme()
+  const { t } = useLanguage()
+
+  // The server keeps bookmarks whose facility has been deactivated, un-verified or
+  // restricted, so the row has to say so: its detail page no longer resolves, and letting
+  // the tap through would land the user on an error instead of a parking spot.
   return (
     <Pressable
       onPress={() => onPress(facility.id)}
-      style={({ pressed }) => pressed && styles.rowPressed}
+      disabled={!facility.available}
+      style={({ pressed }) => [
+        pressed && styles.rowPressed,
+        !facility.available && styles.rowUnavailable,
+      ]}
     >
       <Card style={styles.card}>
         <View style={styles.avatar}>
@@ -46,6 +55,11 @@ function SavedFacilityRow({
           <Text style={[styles.address, { color: colors.muted }]} numberOfLines={1}>
             {facility.address}
           </Text>
+          {facility.available ? null : (
+            <View style={styles.rowBadge}>
+              <Badge variant="neutral">{t('savedUnavailable')}</Badge>
+            </View>
+          )}
         </View>
       </Card>
     </Pressable>
@@ -120,6 +134,8 @@ const styles = StyleSheet.create({
   name: { fontSize: typography.label.fontSize, fontWeight: typography.label.fontWeight },
   address: { fontSize: 12, fontWeight: '400', marginTop: 2 },
   rowPressed: { opacity: 0.85 },
+  rowUnavailable: { opacity: 0.55 },
+  rowBadge: { marginTop: 6 },
   empty: {
     flex: 1,
     alignItems: 'center',
