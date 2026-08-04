@@ -77,6 +77,16 @@ function within(b: MapBounds, p: { lat: number; lng: number }): boolean {
   return p.lat >= b.south && p.lat <= b.north && p.lng >= b.west && p.lng <= b.east
 }
 
+// A pan within the padded fetch area is free — the same points/clusters still cover it.
+// A zoom is not: the API re-clusters per zoom level, so even a fully-contained viewport
+// must refetch once its span has moved far enough from the one last fetched to land in a
+// different zoom bucket, or "zooming in" would keep showing the wide-zoom clusters frozen.
+const ZOOM_SIMILARITY_TOLERANCE = 1.2
+function similarZoom(a: MapBounds, b: MapBounds): boolean {
+  const ratio = (b.east - b.west) / (a.east - a.west)
+  return ratio <= ZOOM_SIMILARITY_TOLERANCE && ratio >= 1 / ZOOM_SIMILARITY_TOLERANCE
+}
+
 // Module-scoped so the one-off initial fit (and its search) runs once per app
 // session, not on every navigation back to Home — avoids redundant data/battery.
 let initialFitDone = false
@@ -117,8 +127,9 @@ export default function MapScreen() {
   const [atUser, setAtUser] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const autoLocated = useRef(false)
-  // The padded bounds the current results cover; pans inside it skip refetching.
-  const lastFetched = useRef<MapBounds | null>(null)
+  // The padded bounds the current results cover, plus the raw (unpadded) viewport bounds
+  // that produced them — pans inside `padded` at a similar zoom to `raw` skip refetching.
+  const lastFetched = useRef<{ padded: MapBounds; raw: MapBounds } | null>(null)
   // The sheet's live visible height (px above the screen bottom), mirrored from
   // its internal translateY on every frame — see BottomSheet's heightValue prop.
   const sheetHeight = useSharedValue(barOffset + PEEK_HEADER_ROOM)
@@ -221,7 +232,7 @@ export default function MapScreen() {
     // Fetch a padded area so nearby pans are already covered; remember it so the
     // region handler can skip refetching while the viewport stays inside it.
     const requestBounds = padBounds(viewport.bounds, FETCH_PADDING)
-    lastFetched.current = requestBounds
+    lastFetched.current = { padded: requestBounds, raw: viewport.bounds }
     // Skeleton only when there's nothing to show. With a populated list the
     // refresh is silent (swap in place), so consecutive map moves don't flash
     // the loading state; an empty result then surfaces the empty-state.
@@ -314,8 +325,16 @@ export default function MapScreen() {
     // Always track the visible area so the list shows only in-view spots, even
     // when the fetch is skipped.
     setVisibleBounds(region.bounds)
-    // Skip the request while the visible area stays within what we already fetched.
-    if (lastFetched.current && contains(lastFetched.current, region.bounds)) return
+    // Skip the request only for a pure pan: still within what we already fetched AND at
+    // essentially the same zoom. A zoom at the same center stays "contained" forever, so
+    // without the zoom check zooming in would keep showing the wide-zoom clusters frozen.
+    if (
+      lastFetched.current &&
+      contains(lastFetched.current.padded, region.bounds) &&
+      similarZoom(lastFetched.current.raw, region.bounds)
+    ) {
+      return
+    }
     setViewport({
       lat: region.lat,
       lng: region.lng,
