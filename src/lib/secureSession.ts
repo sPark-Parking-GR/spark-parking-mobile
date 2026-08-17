@@ -6,12 +6,16 @@ import { z } from 'zod'
 // AsyncStorage is plaintext on disk.
 const SESSION_KEY = 'spark-auth-session'
 
+// `satisfies` checks assignability, not exhaustiveness, so adding a UserRole does NOT fail
+// the build here — it silently makes sessions for that role fail validation and degrade to
+// signed-out. Any new role must be added by hand.
 const USER_ROLES = [
   'guest',
   'user',
   'operator_staff',
   'operator_admin',
   'platform_admin',
+  'super_admin',
 ] as const satisfies readonly UserRole[]
 
 // Re-validated on read: an entry written by an older build (or a partial write) must
