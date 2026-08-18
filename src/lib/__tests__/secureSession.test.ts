@@ -49,7 +49,10 @@ describe('readSession', () => {
 
   it('degrades to signed-out when the role is not one of the known values', async () => {
     mockedGetItem.mockResolvedValue(
-      JSON.stringify({ ...validSession, user: { ...validSession.user, role: 'super_admin' } }),
+      // Deliberately a role that does not exist. It used to be 'super_admin', which stopped
+      // being unknown the moment that tier shipped — leaving the assertion true only because
+      // the schema was stale, which is the opposite of what this test is for.
+      JSON.stringify({ ...validSession, user: { ...validSession.user, role: 'archivist' } }),
     )
     await expect(readSession()).resolves.toBeNull()
   })
