@@ -101,14 +101,20 @@ function buildHtml(
     }
     map.on('moveend', postRegion);
     map.whenReady(postRegion);
-    var PIN_AVAIL = ${JSON.stringify(pinSvgMarkup(true, colors))};
-    var PIN_FULL = ${JSON.stringify(pinSvgMarkup(false, colors))};
+    var PIN_BUSINESS = ${JSON.stringify(pinSvgMarkup('BUSINESS', colors, mode))};
+    var PIN_FREE_PUBLIC = ${JSON.stringify(pinSvgMarkup('FREE_PUBLIC', colors, mode))};
+    var PIN_OTHER = ${JSON.stringify(pinSvgMarkup('RESTRICTED', colors, mode))};
     var PIN_SIZE = [${PIN_SIZE.width}, ${PIN_SIZE.height}];
     var PIN_ANCHOR = [${PIN_SIZE.width * PIN_ANCHOR.x}, ${PIN_SIZE.height * PIN_ANCHOR.y}];
-    function makeIcon(available) {
+    function pinMarkupFor(kind) {
+      if (kind === 'FREE_PUBLIC') return PIN_FREE_PUBLIC;
+      if (kind !== 'BUSINESS') return PIN_OTHER;
+      return PIN_BUSINESS;
+    }
+    function makeIcon(kind) {
       return L.divIcon({
         className: '',
-        html: '<div class="pin">' + (available ? PIN_AVAIL : PIN_FULL) + '</div>',
+        html: '<div class="pin">' + pinMarkupFor(kind) + '</div>',
         iconSize: PIN_SIZE, iconAnchor: PIN_ANCHOR
       });
     }
@@ -137,11 +143,11 @@ function buildHtml(
         var m = markers[it.id];
         if (m) {
           m.setLatLng([it.lat, it.lng]);
-          if (m._available !== it.available) { m.setIcon(makeIcon(it.available)); m._available = it.available; }
+          if (m._kind !== it.kind) { m.setIcon(makeIcon(it.kind)); m._kind = it.kind; }
           return;
         }
-        m = L.marker([it.lat, it.lng], { icon: makeIcon(it.available) }).addTo(layer);
-        m._available = it.available;
+        m = L.marker([it.lat, it.lng], { icon: makeIcon(it.kind) }).addTo(layer);
+        m._kind = it.kind;
         m.on('click', function () {
           var ll = m.getLatLng();
           post({ type: 'spotpress', id: it.id, lat: ll.lat, lng: ll.lng });
@@ -209,7 +215,8 @@ export function LeafletMap({
   const html = useMemo(() => buildHtml(center, colors, mode), [mode])
 
   const payload = useMemo(
-    () => results.map((r) => ({ id: r.id, lat: r.lat, lng: r.lng, available: r.available })),
+    () =>
+      results.map((r) => ({ id: r.id, lat: r.lat, lng: r.lng, kind: r.kind })),
     [results],
   )
 

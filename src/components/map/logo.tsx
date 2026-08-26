@@ -1,10 +1,32 @@
-import type { ThemeContextValue } from '@spark/ui'
+import type { ThemeContextValue, ThemeMode } from '@spark/ui'
 import Svg, { Defs, G, LinearGradient, Path, Stop } from 'react-native-svg'
+
+import type { FacilityKind } from '../../lib/api'
 
 export type PinColors = Pick<
   ThemeContextValue['colors'],
-  'pri' | 'pri2' | 'map' | 'card2' | 'faint'
+  'pri' | 'pri2' | 'map' | 'card2' | 'ok' | 'muted' | 'surface'
 >
+
+// FREE_PUBLIC's dark-mode backing: colors.ok is tuned to sit on a badge chip, not
+// fill a whole pin, and colors.surface (the light-mode icon color) is near-black
+// in dark mode — icon and background would both read as "dark green blob". This
+// deep green keeps the pin premium instead, with the theme's own vibrant `ok`
+// green promoted to the icon so it actually stands out.
+const FREE_PUBLIC_DARK_BG = '#0F3D28'
+
+// Pin color signals facility kind only, not live booking status (that's the
+// badge's job — FacilityCard, SelectedFacilityCard). BUSINESS always renders
+// the same as the "Διαθέσιμο"/Available look — the default brand pin.
+function pinTones(kind: FacilityKind, colors: PinColors, mode: ThemeMode): { back: string; fg: string } {
+  if (kind === 'FREE_PUBLIC') {
+    return mode === 'dark'
+      ? { back: FREE_PUBLIC_DARK_BG, fg: colors.ok }
+      : { back: colors.ok, fg: colors.surface }
+  }
+  if (kind !== 'BUSINESS') return { back: colors.muted, fg: colors.card2 }
+  return { back: colors.map, fg: 'url(#sparkMark)' }
+}
 
 function pinGradientStops(colors: PinColors) {
   return [
@@ -91,9 +113,8 @@ function gradientStopsMarkup(colors: PinColors): string {
 }
 
 // SVG markup string for the WebView (Leaflet) renderer.
-export function pinSvgMarkup(available: boolean, colors: PinColors): string {
-  const back = available ? colors.map : colors.card2
-  const fg = available ? 'url(#sparkMark)' : colors.faint
+export function pinSvgMarkup(kind: FacilityKind, colors: PinColors, mode: ThemeMode): string {
+  const { back, fg } = pinTones(kind, colors, mode)
   const silhouette = `<path d="${PIN_SILHOUETTE}" fill="${back}" stroke="${back}" stroke-width="${PIN_RIM}" stroke-linejoin="round"/>`
   const fgPaths = `<g transform="${LOGO_TRANSFORM}">${LOGO_PATHS.map((d) => `<path d="${d}" fill="${fg}"/>`).join('')}</g>`
   return (
@@ -106,9 +127,16 @@ export function pinSvgMarkup(available: boolean, colors: PinColors): string {
 }
 
 // Native (react-native-svg) marker.
-export function MapPin({ available, colors }: { available: boolean; colors: PinColors }) {
-  const back = available ? colors.map : colors.card2
-  const fg = available ? 'url(#sparkMark)' : colors.faint
+export function MapPin({
+  kind,
+  colors,
+  mode,
+}: {
+  kind: FacilityKind
+  colors: PinColors
+  mode: ThemeMode
+}) {
+  const { back, fg } = pinTones(kind, colors, mode)
   return (
     <Svg width={PIN_SIZE.width} height={PIN_SIZE.height} viewBox={PIN_VIEWBOX}>
       <Defs>

@@ -148,7 +148,7 @@ export function NativeMap({
             )
           }}
         >
-          <MapPin available={r.available} colors={colors} />
+          <MapPin kind={r.kind} colors={colors} mode={mode} />
         </Marker>
       ))}
       {clusters.map((c) => (
