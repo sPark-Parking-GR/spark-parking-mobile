@@ -21,11 +21,13 @@ function FacilityCardBase({
   const isBusiness = result.kind === 'BUSINESS'
   const availability = !isBusiness
     ? { label: t('badgeInfoOnly'), variant: 'neutral' as const }
-    : !result.available
-      ? { label: t('badgeFull'), variant: 'error' as const }
-      : result.remainingSlots <= 5
-        ? { label: t('badgeLimited'), variant: 'warning' as const }
-        : { label: t('badgeAvailable'), variant: 'success' as const }
+    : result.onlineBookingStatus === 'NOT_OFFERED'
+      ? { label: t('badgeWalkInOnly'), variant: 'neutral' as const }
+      : result.onlineBookingStatus === 'FULL'
+        ? { label: t('badgeFull'), variant: 'error' as const }
+        : result.remainingSlots <= 5
+          ? { label: t('badgeLimited'), variant: 'warning' as const }
+          : { label: t('badgeAvailable'), variant: 'success' as const }
 
   return (
     <Pressable
@@ -89,6 +91,7 @@ export const FacilityCard = memo(
     a.result.address === b.result.address &&
     a.result.kind === b.result.kind &&
     a.result.available === b.result.available &&
+    a.result.onlineBookingStatus === b.result.onlineBookingStatus &&
     a.result.remainingSlots === b.result.remainingSlots &&
     a.result.distanceMeters === b.result.distanceMeters &&
     a.result.priceCents === b.result.priceCents &&

@@ -5,6 +5,8 @@ import type { IdentityStrategy } from './identity'
 
 export type FacilityKind = 'BUSINESS' | 'FREE_PUBLIC' | 'RESTRICTED' | 'UNKNOWN'
 
+export type OnlineBookingStatus = 'NOT_OFFERED' | 'FULL' | 'OPEN'
+
 export interface FacilitySearchResult {
   id: string
   name: string
@@ -14,6 +16,7 @@ export interface FacilitySearchResult {
   lng: number
   distanceMeters: number
   available: boolean
+  onlineBookingStatus: OnlineBookingStatus
   remainingSlots: number
   priceCents: number | null
   currency: string

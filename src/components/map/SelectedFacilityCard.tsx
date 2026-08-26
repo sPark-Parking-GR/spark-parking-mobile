@@ -37,10 +37,14 @@ export function SelectedFacilityCard({
       </Text>
       <View style={styles.metaRow}>
         {isBusiness ? (
-          <Badge
-            label={facility.available ? t('badgeAvailable') : t('badgeFull')}
-            variant={facility.available ? 'success' : 'error'}
-          />
+          facility.onlineBookingStatus === 'NOT_OFFERED' ? (
+            <Badge label={t('badgeWalkInOnly')} variant="neutral" />
+          ) : (
+            <Badge
+              label={facility.onlineBookingStatus === 'FULL' ? t('badgeFull') : t('badgeAvailable')}
+              variant={facility.onlineBookingStatus === 'FULL' ? 'error' : 'success'}
+            />
+          )
         ) : (
           <Badge label={t('badgeInfoOnly')} variant="neutral" />
         )}
