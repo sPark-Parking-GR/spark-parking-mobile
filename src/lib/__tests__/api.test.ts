@@ -1,4 +1,9 @@
-import { listMyBookings } from '../api'
+import {
+  createDriverSubscriptionCheckout,
+  getMyDriverSubscription,
+  listDriverPlans,
+  listMyBookings,
+} from '../api'
 import { ApiError, request } from '../http'
 import type { IdentityStrategy } from '../identity'
 
@@ -17,6 +22,73 @@ function makeIdentity(recovers: boolean): IdentityStrategy {
     recoverFromUnauthorized: jest.fn().mockResolvedValue(recovers),
   }
 }
+
+const FREE_ENTITLEMENTS = {
+  bookingDiscountBps: null,
+  bookingFeeWaived: false,
+  freeCancellations: 0,
+  features: [],
+}
+
+describe('driver subscriptions', () => {
+  beforeEach(() => {
+    mockedRequest.mockReset()
+  })
+
+  it('parses the public plan catalog', async () => {
+    mockedRequest.mockResolvedValueOnce([
+      {
+        id: 'plan_1',
+        code: 'plus',
+        name: 'Plus',
+        description: null,
+        priceCents: 990,
+        currency: 'EUR',
+        interval: 'MONTHLY',
+        entitlements: { ...FREE_ENTITLEMENTS, bookingDiscountBps: 1000 },
+      },
+    ])
+
+    await expect(listDriverPlans()).resolves.toHaveLength(1)
+    expect(mockedRequest).toHaveBeenCalledWith('/driver-subscriptions/plans')
+  })
+
+  it('rejects a catalog entry whose shape does not match the contract', async () => {
+    mockedRequest.mockResolvedValueOnce([{ id: 'plan_1', code: 'plus' }])
+
+    await expect(listDriverPlans()).rejects.toThrow()
+  })
+
+  // The normal state for a rider who never subscribed, not an error the screen must handle.
+  it('parses the free-tier subscription', async () => {
+    mockedRequest.mockResolvedValueOnce({
+      planCode: null,
+      planName: null,
+      status: null,
+      currentPeriodEnd: null,
+      entitlements: FREE_ENTITLEMENTS,
+      source: 'free',
+    })
+
+    await expect(getMyDriverSubscription(makeIdentity(false))).resolves.toMatchObject({
+      source: 'free',
+      planCode: null,
+    })
+  })
+
+  it('sends the plan id and returns the hosted checkout url', async () => {
+    mockedRequest.mockResolvedValueOnce({ checkoutUrl: 'https://checkout.example/session_1' })
+
+    await expect(createDriverSubscriptionCheckout('plan_1', makeIdentity(false))).resolves.toBe(
+      'https://checkout.example/session_1',
+    )
+
+    expect(mockedRequest).toHaveBeenCalledWith(
+      '/driver-subscriptions/checkout',
+      expect.objectContaining({ method: 'POST', body: JSON.stringify({ planId: 'plan_1' }) }),
+    )
+  })
+})
 
 describe('withAuthRetry', () => {
   it('retries exactly once after a 401 and succeeds with the fresh token', async () => {

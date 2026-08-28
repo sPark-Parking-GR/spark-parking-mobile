@@ -323,6 +323,76 @@ export function unsaveFacility(facilityId: string, identity: IdentityStrategy): 
   return authedNoContent(`/saved-facilities/${facilityId}`, { method: 'DELETE' }, identity)
 }
 
+/*
+ * Driver subscriptions. The catalog is public; everything about the rider's own plan is
+ * account-scoped. Checkout is a hosted web page the OS browser opens — the app never sees
+ * card data and only learns the outcome by re-reading `/me` after the return deep link.
+ */
+
+// `features` stays `string[]` rather than a closed enum: the catalog is edited from the
+// admin portal, and a tier that ships a feature this build has no label for should render
+// with its raw name, not fail the whole screen's parse.
+const driverEntitlementsSchema = z.object({
+  bookingDiscountBps: z.number().nullable(),
+  bookingFeeWaived: z.boolean(),
+  freeCancellations: z.number().nullable(),
+  features: z.array(z.string()),
+})
+
+export type DriverEntitlements = z.infer<typeof driverEntitlementsSchema>
+
+const driverPlanSchema = z.object({
+  id: z.string().min(1),
+  code: z.string().min(1),
+  name: z.string(),
+  description: z.string().nullable(),
+  priceCents: z.number(),
+  currency: z.string().min(1),
+  interval: z.enum(['MONTHLY', 'YEARLY']),
+  entitlements: driverEntitlementsSchema,
+})
+
+export type DriverPlanSummary = z.infer<typeof driverPlanSchema>
+
+const driverPlansSchema = z.array(driverPlanSchema)
+
+const myDriverSubscriptionSchema = z.object({
+  planCode: z.string().nullable(),
+  planName: z.string().nullable(),
+  status: z.enum(['TRIALING', 'ACTIVE', 'PAST_DUE', 'CANCELLED']).nullable(),
+  currentPeriodEnd: z.string().nullable(),
+  entitlements: driverEntitlementsSchema,
+  source: z.enum(['free', 'subscription', 'subscription+override']),
+})
+
+export type MyDriverSubscription = z.infer<typeof myDriverSubscriptionSchema>
+
+const driverCheckoutSchema = z.object({ checkoutUrl: z.string().url() })
+
+export async function listDriverPlans(): Promise<DriverPlanSummary[]> {
+  const body = await request<unknown>('/driver-subscriptions/plans')
+  return driverPlansSchema.parse(body)
+}
+
+export async function getMyDriverSubscription(
+  identity: IdentityStrategy,
+): Promise<MyDriverSubscription> {
+  const body = await authedRequest<unknown>('/driver-subscriptions/me', { method: 'GET' }, identity)
+  return myDriverSubscriptionSchema.parse(body)
+}
+
+export async function createDriverSubscriptionCheckout(
+  planId: string,
+  identity: IdentityStrategy,
+): Promise<string> {
+  const body = await authedRequest<unknown>(
+    '/driver-subscriptions/checkout',
+    { method: 'POST', body: JSON.stringify({ planId }) },
+    identity,
+  )
+  return driverCheckoutSchema.parse(body).checkoutUrl
+}
+
 const issuedTicketSchema = z.object({
   bookingId: z.string().min(1),
   payload: z.string().min(1),

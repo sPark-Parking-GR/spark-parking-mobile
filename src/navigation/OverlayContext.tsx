@@ -28,6 +28,7 @@ export type OverlayState =
       totalCents: number
       currency: string
     }
+  | { type: 'plan' }
   // `next` is where a successful sign-in lands and `back` where a cancel does — the two
   // differ whenever auth was interposed: succeeding continues the booking, backing out
   // returns to the screen the user tapped from.
@@ -78,6 +79,7 @@ export interface OverlayContextValue {
     currency: string
   }) => void
   viewTicket: (trip: TripRecord) => void
+  openPlan: () => void
   openAuth: (mode: AuthMode, next?: OverlayState) => void
   completeAuth: () => void
   cancelAuth: () => void
@@ -195,6 +197,10 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
     })
   }, [])
 
+  const openPlan = useCallback(() => {
+    setOverlay({ type: 'plan' })
+  }, [])
+
   const closeOverlay = useCallback(() => {
     setOverlay(null)
   }, [])
@@ -216,6 +222,7 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       openReview,
       openTicket,
       viewTicket,
+      openPlan,
       openAuth,
       completeAuth,
       cancelAuth,
@@ -234,6 +241,7 @@ export function OverlayProvider({ children }: { children: ReactNode }): ReactEle
       openReview,
       openTicket,
       viewTicket,
+      openPlan,
       openAuth,
       completeAuth,
       cancelAuth,

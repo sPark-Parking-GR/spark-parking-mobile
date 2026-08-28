@@ -23,6 +23,7 @@ import { SheetExpandContext, useSheetExpandProgress } from '../../src/navigation
 import { AuthOverlay } from '../../src/screens/AuthOverlay'
 import { FacilityDetailOverlay } from '../../src/screens/FacilityDetailOverlay'
 import { FiltersOverlay } from '../../src/screens/FiltersOverlay'
+import { PlanOverlay } from '../../src/screens/PlanOverlay'
 import { ReviewOverlay } from '../../src/screens/ReviewOverlay'
 import { TicketOverlay } from '../../src/screens/TicketOverlay'
 import { TimePickerOverlay } from '../../src/screens/TimePickerOverlay'
@@ -265,6 +266,12 @@ export default function TabsLayout() {
               booking={overlay.booking}
               quote={overlay.quote}
             />
+          </View>
+        )}
+
+        {overlay?.type === 'plan' && (
+          <View style={styles.overlay}>
+            <PlanOverlay />
           </View>
         )}
 

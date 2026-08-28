@@ -21,7 +21,7 @@ export default function ProfileScreen() {
   const { colors, radii, mode, setOverride } = useTheme()
   const { locale, setLocale, t } = useLanguage()
   const { status, user, isAuthenticated, signOut } = useAuth()
-  const { openAuth } = useOverlay()
+  const { openAuth, openPlan } = useOverlay()
   const insets = useSafeAreaInsets()
   const barOffset = tabBarFloatOffset(insets.bottom)
   const [deleting, setDeleting] = useState(false)
@@ -92,15 +92,20 @@ export default function ProfileScreen() {
               />
             </View>
           </View>
-          <View style={[styles.divider, { backgroundColor: colors.line }]} />
-          <View style={styles.inertRow}>
-            <Text style={[styles.rowLabel, { color: colors.ink }]}>
-              {t('profilePaymentMethods')}
-            </Text>
-            <Text style={[styles.inertValue, { color: colors.faint }]}>
-              {t('profileNotAvailableYet')}
-            </Text>
-          </View>
+          {/* A rider's own subscription — nothing a guest has, so the row only exists
+              once there is an account behind it. */}
+          {isAuthenticated ? (
+            <>
+              <View style={[styles.divider, { backgroundColor: colors.line }]} />
+              <Pressable
+                onPress={openPlan}
+                style={({ pressed }) => [styles.inertRow, pressed && styles.navRowPressed]}
+              >
+                <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('profilePlan')}</Text>
+                <Ionicons name="chevron-forward" size={18} color={colors.faint} />
+              </Pressable>
+            </>
+          ) : null}
           <View style={[styles.divider, { backgroundColor: colors.line }]} />
           <View style={styles.inertRow}>
             <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('profileHelp')}</Text>
@@ -212,6 +217,7 @@ const styles = StyleSheet.create({
   },
   rowLabel: { fontSize: typography.body.fontSize, fontWeight: typography.body.fontWeight },
   inertValue: { fontSize: typography.caption.fontSize },
+  navRowPressed: { opacity: 0.6 },
   divider: { height: 1 },
   accountAction: {
     width: '100%',
