@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
+import { PASSWORD_MAX, PASSWORD_MIN } from '@spark/types'
 import { spacing, typography, useTheme } from '@spark/ui'
 import { useEffect, useState } from 'react'
 import {
@@ -21,9 +22,6 @@ import type { AuthMode } from '../navigation/OverlayContext'
 import { useOverlay } from '../navigation/OverlayContext'
 
 const emailSchema = z.string().trim().email()
-
-const PASSWORD_MIN = 8
-const PASSWORD_MAX = 128
 
 const TITLE_KEY: Record<AuthMode, string> = {
   signIn: 'authSignInTitle',
