@@ -16,8 +16,7 @@
       "package": "com.spark.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#020C14",
-        "package": "com.spark.app"
+        "backgroundColor": "#020C14"
       },
       "permissions": [
         "android.permission.ACCESS_COARSE_LOCATION",
