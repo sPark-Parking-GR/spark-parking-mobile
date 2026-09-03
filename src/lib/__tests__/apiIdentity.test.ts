@@ -2,12 +2,21 @@ import type { AuthResult, AuthSession } from '@spark/types'
 
 import { ApiIdentity } from '../apiIdentity'
 import * as authApi from '../authApi'
+import { registerForPushNotificationsAsync } from '../pushNotifications'
 import { clearSession, readSession, writeSession } from '../secureSession'
 
 jest.mock('../authApi')
 jest.mock('../secureSession')
+jest.mock('../pushNotifications')
+jest.mock('expo-localization', () => ({
+  getLocales: () => [{ languageTag: 'en-GB' }],
+}))
+jest.mock('expo-constants', () => ({ expoConfig: { version: '1.0.0' } }))
+
+const mockedRegisterForPush = registerForPushNotificationsAsync as jest.Mock
 
 const mockedRefresh = authApi.refresh as jest.Mock
+const mockedUpdateMobileProfile = authApi.updateMobileProfile as jest.Mock
 const mockedReadSession = readSession as jest.Mock
 const mockedWriteSession = writeSession as jest.Mock
 const mockedClearSession = clearSession as jest.Mock
@@ -26,6 +35,9 @@ async function restoredIdentity(stored: AuthSession | null): Promise<ApiIdentity
   mockedReadSession.mockResolvedValue(stored)
   mockedWriteSession.mockResolvedValue(undefined)
   mockedClearSession.mockResolvedValue(undefined)
+  // adopt() reports locale/appVersion on every sign-in, sign-up and refresh — fire-and-
+  // forget, but still a real call every one of those paths makes.
+  mockedUpdateMobileProfile.mockResolvedValue(undefined)
   const identity = new ApiIdentity()
   await identity.restore()
   return identity
@@ -156,5 +168,56 @@ describe('adopt', () => {
       identity.signIn({ email: 'driver@example.com', password: 'hunter2' }),
     ).resolves.toBeUndefined()
     expect(identity.getSnapshot().status).toBe('authenticated')
+  })
+
+  it('reports locale and app version — needs no permission, unlike the push token', async () => {
+    const identity = await restoredIdentity(null)
+    ;(authApi.signIn as jest.Mock).mockResolvedValue({ session: session() })
+
+    await identity.signIn({ email: 'driver@example.com', password: 'hunter2' })
+
+    expect(mockedUpdateMobileProfile).toHaveBeenCalledWith('access-1', {
+      locale: 'en-GB',
+      appVersion: '1.0.0',
+    })
+  })
+
+  it('does not let a mobile-profile report failure reject sign-in', async () => {
+    const identity = await restoredIdentity(null)
+    mockedUpdateMobileProfile.mockRejectedValue(new Error('offline'))
+    ;(authApi.signIn as jest.Mock).mockResolvedValue({ session: session() })
+
+    await expect(
+      identity.signIn({ email: 'driver@example.com', password: 'hunter2' }),
+    ).resolves.toBeUndefined()
+  })
+})
+
+describe('enableNotifications', () => {
+  it('reports false without registering anything when signed out', async () => {
+    const identity = await restoredIdentity(null)
+
+    await expect(identity.enableNotifications()).resolves.toBe(false)
+    expect(mockedRegisterForPush).not.toHaveBeenCalled()
+  })
+
+  it('reports false and writes nothing when permission is denied (or there is no device)', async () => {
+    const identity = await restoredIdentity(session())
+    mockedRegisterForPush.mockResolvedValue(null)
+    mockedUpdateMobileProfile.mockClear()
+
+    await expect(identity.enableNotifications()).resolves.toBe(false)
+    expect(mockedUpdateMobileProfile).not.toHaveBeenCalled()
+  })
+
+  it('registers the Expo push token against the account once permission is granted', async () => {
+    const identity = await restoredIdentity(session({ accessToken: 'access-1' }))
+    mockedRegisterForPush.mockResolvedValue('ExponentPushToken[abc]')
+    mockedUpdateMobileProfile.mockClear()
+
+    await expect(identity.enableNotifications()).resolves.toBe(true)
+    expect(mockedUpdateMobileProfile).toHaveBeenCalledWith('access-1', {
+      pushToken: 'ExponentPushToken[abc]',
+    })
   })
 })

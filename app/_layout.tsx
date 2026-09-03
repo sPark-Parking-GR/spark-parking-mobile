@@ -1,6 +1,7 @@
 import { useTheme } from '@spark/ui'
 import { StripeProvider } from '@stripe/stripe-react-native'
-import { Stack } from 'expo-router'
+import * as Notifications from 'expo-notifications'
+import { router, Stack } from 'expo-router'
 import { StatusBar } from 'expo-status-bar'
 import type { ReactElement } from 'react'
 import { useEffect } from 'react'
@@ -14,6 +15,18 @@ import { purgeLegacyQrSecrets } from '../src/lib/qrSecretPurge'
 import { SavedFacilitiesProvider } from '../src/lib/savedFacilities'
 import { OverlayProvider } from '../src/navigation/OverlayContext'
 import { AppThemeProvider } from '../src/theme/AppThemeProvider'
+
+// Module-level, once: still shows an alert while the app is foregrounded, matching what
+// the OS already does automatically while backgrounded.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+    shouldShowBanner: true,
+    shouldShowList: true,
+  }),
+})
 
 // Mounting StripeProvider without a key makes the SDK throw on first use, which would take
 // the whole app down over a missing env var rather than the one screen that needs it.
@@ -52,6 +65,16 @@ export default function RootLayout() {
   // Ahead of any screen that could rewrite the trips caches this reads booking ids from.
   useEffect(() => {
     purgeLegacyQrSecrets().catch(() => undefined)
+  }, [])
+
+  // Deep-links a tapped notification to the screen it's about — today only bookings, and
+  // only the list, since there is no per-booking detail screen to land on more precisely.
+  useEffect(() => {
+    const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+      const data = response.notification.request.content.data
+      if (data?.['type'] === 'booking') router.push('/(tabs)/trips')
+    })
+    return () => subscription.remove()
   }, [])
 
   return (

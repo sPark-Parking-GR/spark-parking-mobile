@@ -55,3 +55,23 @@ export function deleteAccount(accessToken: string, password: string): Promise<vo
     body: JSON.stringify({ password }),
   })
 }
+
+export interface MobileProfileUpdate {
+  pushToken?: string
+  locale?: string
+  appVersion?: string
+}
+
+// Self-scoped server-side (PATCH /auth/mobile-profile reads the caller's id off the bearer
+// token, never the body) — an upsert, so the first call creates the row and later ones
+// update it. The response body (the stored row) is never needed here.
+export function updateMobileProfile(
+  accessToken: string,
+  update: MobileProfileUpdate,
+): Promise<void> {
+  return requestNoContent('/auth/mobile-profile', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${accessToken}` },
+    body: JSON.stringify(update),
+  })
+}

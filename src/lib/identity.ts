@@ -31,6 +31,10 @@ export interface SessionIdentity extends IdentityStrategy {
   // Erases the account server-side and drops to signed-out. Rejects — leaving the session
   // untouched — when the password is wrong or the account still has a booking to settle.
   deleteAccount(password: string): Promise<void>
+  // Requests notification permission (a no-op if already decided) and, if granted,
+  // registers the resulting Expo push token against the account. Resolves false rather
+  // than rejecting on a denied permission — that is an expected outcome, not a failure.
+  enableNotifications(): Promise<boolean>
 }
 
 const SIGNED_OUT: AuthSnapshot = { status: 'anonymous', user: null }
@@ -80,6 +84,10 @@ export class AnonymousIdentity implements SessionIdentity {
 
   deleteAccount(): Promise<void> {
     return Promise.reject(new Error(AUTH_DISABLED))
+  }
+
+  enableNotifications(): Promise<boolean> {
+    return Promise.resolve(false)
   }
 }
 

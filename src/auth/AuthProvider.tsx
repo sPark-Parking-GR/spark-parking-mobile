@@ -13,6 +13,7 @@ export interface AuthContextValue extends AuthSnapshot {
   signOut: () => Promise<void>
   requestPasswordReset: (email: string) => Promise<void>
   deleteAccount: (password: string) => Promise<void>
+  enableNotifications: () => Promise<boolean>
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -45,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }): ReactElemen
       signOut: () => identity.signOut(),
       requestPasswordReset: (email) => identity.requestPasswordReset(email),
       deleteAccount: (password) => identity.deleteAccount(password),
+      enableNotifications: () => identity.enableNotifications(),
     }),
     [snapshot],
   )

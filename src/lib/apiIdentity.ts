@@ -1,8 +1,11 @@
 import type { AuthSession, SignInCredentials } from '@spark/types'
+import Constants from 'expo-constants'
+import { getLocales } from 'expo-localization'
 
 import * as authApi from './authApi'
 import type { SignUpRequest } from './authApi'
 import type { AuthSnapshot, SessionIdentity } from './identity'
+import { registerForPushNotificationsAsync } from './pushNotifications'
 import { clearSession, readSession, writeSession } from './secureSession'
 
 // Access tokens live 15 minutes; renew inside the last minute so a request that is
@@ -92,6 +95,17 @@ export class ApiIdentity implements SessionIdentity {
     await this.forget()
   }
 
+  async enableNotifications(): Promise<boolean> {
+    const accessToken = await this.currentAccessToken()
+    if (!accessToken) return false
+
+    const pushToken = await registerForPushNotificationsAsync()
+    if (!pushToken) return false
+
+    await authApi.updateMobileProfile(accessToken, { pushToken })
+    return true
+  }
+
   private async currentAccessToken(): Promise<string | null> {
     const current = this.session
     if (!current) return null
@@ -134,6 +148,20 @@ export class ApiIdentity implements SessionIdentity {
     // Best effort: a keystore write failure must not fail the sign-in, nor the refresh
     // that is unblocking an in-flight booking.
     await writeSession(session).catch(() => undefined)
+    // Fire-and-forget: needs no permission, so it happens on every sign-in, sign-up and
+    // token refresh rather than waiting on the (opt-in, permission-gated) push token.
+    this.reportMobileProfile(session.accessToken).catch(() => undefined)
+  }
+
+  private reportMobileProfile(accessToken: string): Promise<void> {
+    const locale = getLocales()[0]?.languageTag
+    const appVersion = Constants.expoConfig?.version
+    return authApi
+      .updateMobileProfile(accessToken, {
+        ...(locale ? { locale } : {}),
+        ...(appVersion ? { appVersion } : {}),
+      })
+      .catch(() => undefined)
   }
 
   private async forget(): Promise<void> {

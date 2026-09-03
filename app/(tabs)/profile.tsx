@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons'
 import { Card, SegmentedControl, spacing, typography, useTheme } from '@spark/ui'
 import type { ThemeMode } from '@spark/ui'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -10,6 +10,7 @@ import { DeleteAccountDialog } from '../../src/components/DeleteAccountDialog'
 import type { Locale } from '../../src/i18n/messages'
 import { useLanguage } from '../../src/i18n/LanguageProvider'
 import { tabBarFloatOffset } from '../../src/lib/constants'
+import { hasNotificationPermission } from '../../src/lib/pushNotifications'
 import { useOverlay } from '../../src/navigation/OverlayContext'
 
 const LANGUAGE_OPTIONS: { value: Locale; label: string }[] = [
@@ -20,11 +21,29 @@ const LANGUAGE_OPTIONS: { value: Locale; label: string }[] = [
 export default function ProfileScreen() {
   const { colors, radii, mode, setOverride } = useTheme()
   const { locale, setLocale, t } = useLanguage()
-  const { status, user, isAuthenticated, signOut } = useAuth()
+  const { status, user, isAuthenticated, signOut, enableNotifications } = useAuth()
   const { openAuth, openPlan } = useOverlay()
   const insets = useSafeAreaInsets()
   const barOffset = tabBarFloatOffset(insets.bottom)
   const [deleting, setDeleting] = useState(false)
+  const [notificationsOn, setNotificationsOn] = useState(false)
+  const [notificationsDenied, setNotificationsDenied] = useState(false)
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+    hasNotificationPermission()
+      .then(setNotificationsOn)
+      .catch(() => undefined)
+  }, [isAuthenticated])
+
+  const handleEnableNotifications = () => {
+    enableNotifications()
+      .then((granted) => {
+        setNotificationsOn(granted)
+        setNotificationsDenied(!granted)
+      })
+      .catch(() => undefined)
+  }
 
   const THEME_OPTIONS: { value: ThemeMode; label: string }[] = [
     { value: 'dark', label: t('themeDark') },
@@ -104,6 +123,24 @@ export default function ProfileScreen() {
                 <Text style={[styles.rowLabel, { color: colors.ink }]}>{t('profilePlan')}</Text>
                 <Ionicons name="chevron-forward" size={18} color={colors.faint} />
               </Pressable>
+              <View style={[styles.divider, { backgroundColor: colors.line }]} />
+              <Pressable
+                onPress={notificationsOn ? undefined : handleEnableNotifications}
+                disabled={notificationsOn}
+                style={styles.inertRow}
+              >
+                <Text style={[styles.rowLabel, { color: colors.ink }]}>
+                  {t('profileNotifications')}
+                </Text>
+                <Text style={[styles.inertValue, { color: colors.faint }]}>
+                  {notificationsOn ? t('profileNotificationsOn') : t('profileNotificationsOff')}
+                </Text>
+              </Pressable>
+              {notificationsDenied ? (
+                <Text style={[styles.accountNote, { color: colors.faint }]}>
+                  {t('profileNotificationsDenied')}
+                </Text>
+              ) : null}
             </>
           ) : null}
           <View style={[styles.divider, { backgroundColor: colors.line }]} />
