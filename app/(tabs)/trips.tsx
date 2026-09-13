@@ -2,6 +2,7 @@ import { Badge, Card, spacing, typography, useTheme } from '@spark/ui'
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
+import { useAuth } from '../../src/auth/AuthProvider'
 import { useLanguage } from '../../src/i18n/LanguageProvider'
 import { tabBarFloatOffset, vehicleLabel } from '../../src/lib/constants'
 import { formatMoney, formatTimeRange } from '../../src/lib/format'
@@ -11,7 +12,9 @@ import { useOverlay } from '../../src/navigation/OverlayContext'
 export default function TripsScreen() {
   const { colors } = useTheme()
   const { t, locale } = useLanguage()
-  const { trips, tripsRefreshing, refreshTrips, openFacilityDetail, viewTicket } = useOverlay()
+  const { status, isAuthenticated } = useAuth()
+  const { trips, tripsRefreshing, refreshTrips, openFacilityDetail, viewTicket, openAuth } =
+    useOverlay()
   const insets = useSafeAreaInsets()
   const barOffset = tabBarFloatOffset(insets.bottom)
 
@@ -60,7 +63,23 @@ export default function TripsScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       <Text style={[styles.title, { color: colors.ink }]}>{t('tripsTitle')}</Text>
-      {sorted.length === 0 ? (
+      {status === 'restoring' ? null : !isAuthenticated ? (
+        <View style={styles.empty}>
+          <Text style={[styles.emptyText, { color: colors.faint }]}>
+            {t('tripsSignedOutBody')}
+          </Text>
+          <Pressable
+            onPress={() => openAuth('signIn')}
+            style={({ pressed }) => [
+              styles.signInAction,
+              { borderColor: colors.line },
+              pressed && styles.signInActionPressed,
+            ]}
+          >
+            <Text style={[styles.signInText, { color: colors.pri }]}>{t('profileSignIn')}</Text>
+          </Pressable>
+        </View>
+      ) : sorted.length === 0 ? (
         <View style={styles.empty}>
           <Text style={[styles.emptyText, { color: colors.faint }]}>{t('tripsEmpty')}</Text>
         </View>
@@ -118,4 +137,13 @@ const styles = StyleSheet.create({
   directions: { fontSize: 13, fontWeight: '700' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
   emptyText: { fontSize: 15, textAlign: 'center' },
+  signInAction: {
+    marginTop: spacing.lg,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  signInActionPressed: { opacity: 0.85 },
+  signInText: { fontSize: 15, fontWeight: '700' },
 })

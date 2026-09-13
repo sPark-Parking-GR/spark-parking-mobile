@@ -23,6 +23,10 @@ function asUser(id: string): void {
   mockedUseAuth.mockReturnValue({ user: { id } })
 }
 
+function asGuest(): void {
+  mockedUseAuth.mockReturnValue({ user: null })
+}
+
 function cachedFacility(id: string): SavedFacility {
   return { id, name: 'Central Parking', address: '1 Main St', available: true }
 }
@@ -112,5 +116,67 @@ describe('toggleSaved', () => {
     resolveSave()
     await flush()
     expect(result.current.isSaved('f2')).toBe(true)
+  })
+})
+
+describe('guest favourites', () => {
+  it('reads the local guest list without ever calling the server', async () => {
+    await AsyncStorage.setItem(
+      'spark-saved-facilities:guest',
+      JSON.stringify([cachedFacility('f1')]),
+    )
+    asGuest()
+
+    const { result } = renderHook(() => useSavedFacilities(), { wrapper })
+    await flush()
+
+    expect(result.current.saved).toEqual([cachedFacility('f1')])
+    expect(mockedList).not.toHaveBeenCalled()
+  })
+
+  it('saves and unsaves locally with no network call', async () => {
+    asGuest()
+
+    const { result } = renderHook(() => useSavedFacilities(), { wrapper })
+    await flush()
+
+    act(() => {
+      result.current.toggleSaved(cachedFacility('f1'))
+    })
+
+    expect(result.current.isSaved('f1')).toBe(true)
+    expect(mockedSave).not.toHaveBeenCalled()
+
+    const stored = await AsyncStorage.getItem('spark-saved-facilities:guest')
+    expect(JSON.parse(stored!)).toEqual([cachedFacility('f1')])
+
+    act(() => {
+      result.current.toggleSaved(cachedFacility('f1'))
+    })
+
+    expect(result.current.isSaved('f1')).toBe(false)
+  })
+
+  it('pushes guest favourites to the account and clears the guest slot on sign-in', async () => {
+    await AsyncStorage.setItem(
+      'spark-saved-facilities:guest',
+      JSON.stringify([cachedFacility('f1')]),
+    )
+    asGuest()
+    mockedList.mockResolvedValue([
+      { facilityId: 'f1', name: 'Central Parking', address: '1 Main St', available: true },
+    ])
+
+    const { result, rerender } = renderHook(() => useSavedFacilities(), { wrapper })
+    await flush()
+    expect(result.current.saved).toEqual([cachedFacility('f1')])
+
+    asUser('u1')
+    rerender()
+    await flush()
+
+    expect(mockedSave).toHaveBeenCalledWith('f1', expect.anything())
+    expect(await AsyncStorage.getItem('spark-saved-facilities:guest')).toBeNull()
+    expect(result.current.saved).toEqual([cachedFacility('f1')])
   })
 })

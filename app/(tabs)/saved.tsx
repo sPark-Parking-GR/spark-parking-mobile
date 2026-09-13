@@ -6,6 +6,7 @@ import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
 
+import { useAuth } from '../../src/auth/AuthProvider'
 import { Card } from '../../src/components/ui'
 import { LogoMark } from '../../src/components/map/logo'
 import { useLanguage } from '../../src/i18n/LanguageProvider'
@@ -70,8 +71,9 @@ export default function SavedScreen() {
   const { colors } = useTheme()
   const { t } = useLanguage()
   const insets = useSafeAreaInsets()
+  const { status, isAuthenticated } = useAuth()
   const { saved, reload } = useSavedFacilities()
-  const { openFacilityDetail } = useOverlay()
+  const { openFacilityDetail, openAuth } = useOverlay()
   const barOffset = tabBarFloatOffset(insets.bottom)
 
   useFocusEffect(
@@ -83,6 +85,24 @@ export default function SavedScreen() {
   return (
     <View style={[styles.root, { backgroundColor: colors.bg, paddingTop: insets.top }]}>
       <Text style={[styles.title, { color: colors.ink }]}>{t('savedTitle')}</Text>
+      {/* Favourites work fully offline for a guest — the sync banner is a nudge to back
+          them up, never a gate on using the tab. */}
+      {status === 'restoring' || isAuthenticated ? null : (
+        <Pressable
+          onPress={() => openAuth('signIn')}
+          style={({ pressed }) => [
+            styles.syncBanner,
+            { backgroundColor: colors.card2 },
+            pressed && styles.rowPressed,
+          ]}
+        >
+          <Ionicons name="cloud-upload-outline" size={20} color={colors.pri} />
+          <Text style={[styles.syncBannerText, { color: colors.ink }]}>
+            {t('savedSignedOutBody')}
+          </Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.faint} />
+        </Pressable>
+      )}
       {saved.length === 0 ? (
         <View style={styles.empty}>
           <Ionicons name="star-outline" size={40} color={colors.faint} style={styles.emptyIcon} />
@@ -144,4 +164,14 @@ const styles = StyleSheet.create({
   },
   emptyIcon: { marginBottom: 14 },
   emptyText: { fontSize: 15, lineHeight: 22, textAlign: 'center' },
+  syncBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginHorizontal: 18,
+    marginBottom: spacing.sm,
+    padding: 14,
+    borderRadius: 16,
+  },
+  syncBannerText: { flex: 1, fontSize: 13, lineHeight: 18 },
 })

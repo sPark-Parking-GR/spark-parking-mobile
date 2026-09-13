@@ -16,9 +16,12 @@ import { identity } from './identity'
 import { useAuth } from '../auth/AuthProvider'
 
 // Scoped to the account, like the trips cache: saved spots are personal, and a shared
-// device must not leak the previous user's list.
-function cacheKey(userId: string): string {
-  return `spark-saved-facilities:${userId}`
+// device must not leak the previous user's list. A signed-out visitor gets the one fixed
+// "guest" slot instead of a userId — there is no account yet to scope it to.
+const GUEST_SCOPE = 'guest'
+
+function cacheKey(scope: string): string {
+  return `spark-saved-facilities:${scope}`
 }
 
 export interface SavedFacility {
@@ -48,8 +51,8 @@ function fromRemote(remote: RemoteSavedFacility): SavedFacility {
   }
 }
 
-async function readCache(userId: string): Promise<SavedFacility[]> {
-  const raw = await AsyncStorage.getItem(cacheKey(userId)).catch(() => null)
+async function readCache(scope: string): Promise<SavedFacility[]> {
+  const raw = await AsyncStorage.getItem(cacheKey(scope)).catch(() => null)
   if (!raw) return []
   try {
     const parsed = z.array(savedSchema).safeParse(JSON.parse(raw))
@@ -59,8 +62,12 @@ async function readCache(userId: string): Promise<SavedFacility[]> {
   }
 }
 
-function writeCache(userId: string, saved: SavedFacility[]): Promise<void> {
-  return AsyncStorage.setItem(cacheKey(userId), JSON.stringify(saved)).catch(() => undefined)
+function writeCache(scope: string, saved: SavedFacility[]): Promise<void> {
+  return AsyncStorage.setItem(cacheKey(scope), JSON.stringify(saved)).catch(() => undefined)
+}
+
+function clearCache(scope: string): Promise<void> {
+  return AsyncStorage.removeItem(cacheKey(scope)).catch(() => undefined)
 }
 
 export interface SavedFacilitiesContextValue {
@@ -81,15 +88,28 @@ export function SavedFacilitiesProvider({ children }: { children: ReactNode }): 
   const [saved, setSaved] = useState<SavedFacility[]>([])
 
   useEffect(() => {
-    if (!userId) {
-      setSaved([])
-      return
-    }
-
     let cancelled = false
 
-    const hydrate = async (): Promise<void> => {
-      const cached = await readCache(userId)
+    // A guest's favourites live in the one fixed local slot, with nothing to sync — there
+    // is no account yet for the server to attach them to.
+    const hydrateGuest = async (): Promise<void> => {
+      const cached = await readCache(GUEST_SCOPE)
+      if (!cancelled) setSaved(cached)
+    }
+
+    // Runs once per device the first time a real session appears. Anything saved as a
+    // guest is pushed up before the account's own list is read back, so favourites
+    // survive signing up instead of being silently replaced by an empty server list.
+    const hydrateAccount = async (uid: string): Promise<void> => {
+      const guestSaved = await readCache(GUEST_SCOPE)
+      if (guestSaved.length > 0) {
+        await Promise.all(
+          guestSaved.map((facility) => saveFacility(facility.id, identity).catch(() => undefined)),
+        )
+        await clearCache(GUEST_SCOPE)
+      }
+
+      const cached = await readCache(uid)
       if (cancelled) return
       if (cached.length > 0) setSaved(cached)
 
@@ -98,10 +118,14 @@ export function SavedFacilitiesProvider({ children }: { children: ReactNode }): 
 
       const records = remote.map(fromRemote)
       setSaved(records)
-      await writeCache(userId, records)
+      await writeCache(uid, records)
     }
 
-    hydrate().catch(() => undefined)
+    if (userId) {
+      hydrateAccount(userId).catch(() => undefined)
+    } else {
+      hydrateGuest().catch(() => undefined)
+    }
 
     return () => {
       cancelled = true
@@ -127,7 +151,7 @@ export function SavedFacilitiesProvider({ children }: { children: ReactNode }): 
 
   const toggleSaved = useCallback(
     (facility: SavedFacility) => {
-      if (!userId) return
+      const scope = userId ?? GUEST_SCOPE
 
       const wasSaved = saved.some((entry) => entry.id === facility.id)
       const next = wasSaved
@@ -137,7 +161,11 @@ export function SavedFacilitiesProvider({ children }: { children: ReactNode }): 
       // Applied locally first: the star must respond at the barrier with no signal. A
       // failed write is reconciled by the next successful list fetch.
       setSaved(next)
-      writeCache(userId, next).catch(() => undefined)
+      writeCache(scope, next).catch(() => undefined)
+
+      // A guest has no server row to push to yet — the local write above is the whole
+      // action, and it travels online once hydrateAccount runs after sign-up.
+      if (!userId) return
 
       const push = wasSaved
         ? unsaveFacility(facility.id, identity)
