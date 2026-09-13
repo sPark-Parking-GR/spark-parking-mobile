@@ -29,7 +29,11 @@ function errorKey(error: unknown): string {
 export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { colors, radii } = useTheme()
   const { t } = useLanguage()
-  const { deleteAccount } = useAuth()
+  const { user, deleteAccount } = useAuth()
+  // A dashboard identity (operator, platform or super admin) is preserved server-side —
+  // only this app's own data is cleared — so the confirmation must not claim the whole
+  // account and password are erased.
+  const mobileOnly = user != null && user.role !== 'user'
 
   const [password, setPassword] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -87,8 +91,12 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
             showsVerticalScrollIndicator={false}
           >
             <Card style={[styles.card, { borderRadius: radii.lg }]}>
-              <Text style={[styles.title, { color: colors.ink }]}>{t('deleteAccountTitle')}</Text>
-              <Text style={[styles.body, { color: colors.muted }]}>{t('deleteAccountBody')}</Text>
+              <Text style={[styles.title, { color: colors.ink }]}>
+                {t(mobileOnly ? 'deleteAccountTitleMobileOnly' : 'deleteAccountTitle')}
+              </Text>
+              <Text style={[styles.body, { color: colors.muted }]}>
+                {t(mobileOnly ? 'deleteAccountBodyMobileOnly' : 'deleteAccountBody')}
+              </Text>
               <Text style={[styles.body, { color: colors.muted }]}>
                 {t('deleteAccountBookingsNote')}
               </Text>
@@ -113,7 +121,7 @@ export function DeleteAccountDialog({ open, onClose }: { open: boolean; onClose:
 
               <View style={styles.actions}>
                 <Button
-                  label={t('deleteAccountConfirm')}
+                  label={t(mobileOnly ? 'deleteAccountConfirmMobileOnly' : 'deleteAccountConfirm')}
                   onPress={submit}
                   variant="danger"
                   loading={submitting}
