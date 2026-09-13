@@ -18,6 +18,7 @@ import { z } from 'zod'
 import { useAuth } from '../auth/AuthProvider'
 import { Button, Card, Field } from '../components/ui'
 import { useLanguage } from '../i18n/LanguageProvider'
+import { ApiError } from '../lib/http'
 import type { AuthMode } from '../navigation/OverlayContext'
 import { useOverlay } from '../navigation/OverlayContext'
 
@@ -39,6 +40,16 @@ const SUBMIT_KEY: Record<AuthMode, string> = {
   signIn: 'authSignInCta',
   signUp: 'authSignUpCta',
   forgotPassword: 'authForgotCta',
+}
+
+// The server answers a duplicate sign-up with a plain English message ("Email already in
+// use") that never passes through this app's translations — surface a localized one for
+// the one case worth naming, and fall back to the raw message for everything else.
+function submitErrorKey(mode: AuthMode, error: unknown): string | null {
+  if (mode === 'signUp' && error instanceof ApiError && error.status === 409) {
+    return 'authEmailInUse'
+  }
+  return null
 }
 
 function validationKey(mode: AuthMode, email: string, password: string): string | null {
@@ -114,7 +125,8 @@ export function AuthOverlay({ mode: initialMode }: { mode: AuthMode }) {
 
       completeAuth()
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('authGenericError'))
+      const key = submitErrorKey(mode, e)
+      setError(key ? t(key) : e instanceof Error ? e.message : t('authGenericError'))
       setSubmitting(false)
     }
   }
