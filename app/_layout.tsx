@@ -1,4 +1,4 @@
-import { useTheme } from '@spark/ui'
+import { useTheme } from '../src/theme'
 import { StripeProvider } from '@stripe/stripe-react-native'
 import * as Notifications from 'expo-notifications'
 import { router, Stack } from 'expo-router'

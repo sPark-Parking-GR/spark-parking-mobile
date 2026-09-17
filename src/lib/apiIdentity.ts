@@ -1,4 +1,4 @@
-import type { AuthSession, SignInCredentials } from '@spark/types'
+import type { AuthSession, SignInCredentials } from '../types/auth'
 import Constants from 'expo-constants'
 import { getLocales } from 'expo-localization'
 

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
-import { spacing, typography, useTheme } from '@spark/ui'
+import { spacing, typography, useTheme } from '../theme'
 import type { ReactNode } from 'react'
 import {
   ActivityIndicator,
@@ -105,7 +105,7 @@ export function Button({
     >
       {!isSecondary && !isDanger && (
         <View style={styles.btnGradientClip}>
-          <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+          <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
             <Defs>
               <LinearGradient id="btnGrad" x1="0" y1="0" x2="0" y2="1">
                 <Stop offset="0" stopColor={colors.pri} />
@@ -213,7 +213,7 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   btnGradientClip: {
-    ...StyleSheet.absoluteFillObject,
+    ...StyleSheet.absoluteFill,
     borderRadius: BTN_RADIUS,
     overflow: 'hidden',
   },

@@ -1,6 +1,6 @@
 import { Ionicons, MaterialIcons } from '@expo/vector-icons'
-import { computeDistanceMeters, generalizedCostCents } from '@spark/maps'
-import { spacing, useTheme } from '@spark/ui'
+import { computeDistanceMeters, generalizedCostCents } from '../../src/lib/geo'
+import { spacing, useTheme } from '../../src/theme'
 import { useFocusEffect } from 'expo-router'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -130,6 +130,10 @@ export default function MapScreen() {
   // The padded bounds the current results cover, plus the raw (unpadded) viewport bounds
   // that produced them — pans inside `padded` at a similar zoom to `raw` skip refetching.
   const lastFetched = useRef<{ padded: MapBounds; raw: MapBounds } | null>(null)
+  // The last response's mode, echoed back on the next search so the server can
+  // apply hysteresis around its points/clusters threshold — see onRegionChange's
+  // fetch effect below.
+  const lastModeRef = useRef<'points' | 'clusters' | undefined>(undefined)
   // The sheet's live visible height (px above the screen bottom), mirrored from
   // its internal translateY on every frame — see BottomSheet's heightValue prop.
   const sheetHeight = useSharedValue(barOffset + PEEK_HEADER_ROOM)
@@ -247,10 +251,12 @@ export default function MapScreen() {
         startsAt: applied.startsAt,
         endsAt: applied.endsAt,
         vehicleType: applied.vehicleType,
+        preferMode: lastModeRef.current,
       },
       { signal: controller.signal },
     )
       .then((resp) => {
+        lastModeRef.current = resp.mode
         setResults(resp.points)
         setClusters(resp.clusters)
       })

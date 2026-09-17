@@ -1,4 +1,4 @@
-import type { AuthSession } from '@spark/types'
+import type { AuthSession } from '../../types/auth'
 import * as SecureStore from 'expo-secure-store'
 
 import { clearSession, readSession, writeSession } from '../secureSession'

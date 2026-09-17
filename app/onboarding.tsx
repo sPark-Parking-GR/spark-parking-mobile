@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { spacing, typography, useTheme } from '@spark/ui'
+import { spacing, typography, useTheme } from '../src/theme'
 import { router } from 'expo-router'
 import { useEffect, useState } from 'react'
 import type { LayoutChangeEvent } from 'react-native'
@@ -72,7 +72,7 @@ export default function OnboardingScreen() {
 
   return (
     <View style={styles.root}>
-      <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+      <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
         <Defs>
           <LinearGradient id="bgGrad" x1="0" y1="0" x2="0" y2="1">
             <Stop offset="0" stopColor={colors.bg} />
@@ -83,7 +83,7 @@ export default function OnboardingScreen() {
       </Svg>
 
       <View style={[styles.top, { paddingTop: insets.top }]} onLayout={onSceneLayout}>
-        <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+        <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
           <Defs>
             <RadialGradient id="glow" cx="50%" cy="30%" r="55%">
               <Stop offset="0" stopColor={GLOW_COLOR} stopOpacity={0.22} />

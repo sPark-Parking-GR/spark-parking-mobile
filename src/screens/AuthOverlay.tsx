@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
-import { PASSWORD_MAX, PASSWORD_MIN } from '@spark/types'
-import { spacing, typography, useTheme } from '@spark/ui'
+import { PASSWORD_MAX, PASSWORD_MIN } from '../types/auth'
+import { spacing, typography, useTheme } from '../theme'
 import { useEffect, useState } from 'react'
 import {
   BackHandler,

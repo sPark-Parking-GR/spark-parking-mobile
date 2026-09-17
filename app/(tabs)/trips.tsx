@@ -1,4 +1,4 @@
-import { Badge, Card, spacing, typography, useTheme } from '@spark/ui'
+import { Badge, Card, spacing, typography, useTheme } from '../../src/theme'
 import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 

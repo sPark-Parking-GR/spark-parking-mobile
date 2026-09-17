@@ -1,5 +1,5 @@
-import type { ThemeContextValue } from '@spark/ui'
-import { useTheme } from '@spark/ui'
+import type { ThemeContextValue } from '../../theme'
+import { useTheme } from '../../theme'
 import { useEffect, useMemo, useRef } from 'react'
 import { StyleSheet, View } from 'react-native'
 import { WebView, type WebViewMessageEvent } from 'react-native-webview'
@@ -29,6 +29,11 @@ function buildHtml(
       border: 2px solid ${colors.surface}; color: ${colors.ink}; display: flex;
       align-items: center; justify-content: center; font: 700 13px system-ui, sans-serif;
       box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: pointer; }
+    /* Applied only while a marker is entering/leaving/repositioning (see
+       animateIcon below) so an ordinary pan/zoom's own position updates,
+       driven by the map pane transform rather than per-marker setLatLng,
+       are never caught mid-transition. */
+    .leaflet-marker-icon.anim { transition: transform 300ms ease, opacity 240ms ease; }
   </style>
 </head>
 <body>
@@ -118,43 +123,6 @@ function buildHtml(
         iconSize: PIN_SIZE, iconAnchor: PIN_ANCHOR
       });
     }
-    // Persistent markers keyed by id. Refetch reconciles in place so the tapped
-    // marker is never destroyed and re-created.
-    var markers = {};
-    var clusterMarkers = {};
-    function clearClusters() {
-      Object.keys(clusterMarkers).forEach(function (id) {
-        clusterLayer.removeLayer(clusterMarkers[id]); delete clusterMarkers[id];
-      });
-    }
-    function clearPoints() {
-      Object.keys(markers).forEach(function (id) {
-        layer.removeLayer(markers[id]); delete markers[id];
-      });
-    }
-    window.render = function (items) {
-      if (items.length) clearClusters();
-      var next = {};
-      items.forEach(function (it) { next[it.id] = true; });
-      Object.keys(markers).forEach(function (id) {
-        if (!next[id]) { layer.removeLayer(markers[id]); delete markers[id]; }
-      });
-      items.forEach(function (it) {
-        var m = markers[it.id];
-        if (m) {
-          m.setLatLng([it.lat, it.lng]);
-          if (m._kind !== it.kind) { m.setIcon(makeIcon(it.kind)); m._kind = it.kind; }
-          return;
-        }
-        m = L.marker([it.lat, it.lng], { icon: makeIcon(it.kind) }).addTo(layer);
-        m._kind = it.kind;
-        m.on('click', function () {
-          var ll = m.getLatLng();
-          post({ type: 'spotpress', id: it.id, lat: ll.lat, lng: ll.lng });
-        });
-        markers[it.id] = m;
-      });
-    };
     function makeClusterIcon(count) {
       return L.divIcon({
         className: '',
@@ -162,28 +130,172 @@ function buildHtml(
         iconSize: [44, 44], iconAnchor: [22, 22]
       });
     }
-    window.renderClusters = function (items) {
-      if (items.length) clearPoints();
-      var next = {};
-      items.forEach(function (it) { next[it.id] = true; });
-      Object.keys(clusterMarkers).forEach(function (id) {
-        if (!next[id]) { clusterLayer.removeLayer(clusterMarkers[id]); delete clusterMarkers[id]; }
+    var FLY_MS = 320, FADE_MS = 240;
+    function animateIcon(marker, ms) {
+      var icon = marker._icon;
+      if (!icon) return;
+      icon.classList.add('anim');
+      setTimeout(function () { if (icon.classList) icon.classList.remove('anim'); }, ms);
+    }
+    function distSq(aLat, aLng, bLat, bLng) {
+      var dLat = aLat - bLat, dLng = aLng - bLng;
+      return dLat * dLat + dLng * dLng;
+    }
+    // An entering marker only flies from a vanished one within this fraction
+    // of the current extent (the bounding diagonal of everything in play this
+    // update) — otherwise it fades in in place. Without a cap, an unrelated
+    // pair of markers leaving and arriving on opposite sides of the same
+    // viewport update would fly across the whole map at each other, reading
+    // as a bug rather than a cluster splitting or merging.
+    var FLIGHT_EXTENT_FRACTION = 0.4;
+    function extentOf(points) {
+      if (!points.length) return 0;
+      var minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+      points.forEach(function (p) {
+        if (p.lat < minLat) minLat = p.lat;
+        if (p.lat > maxLat) maxLat = p.lat;
+        if (p.lng < minLng) minLng = p.lng;
+        if (p.lng > maxLng) maxLng = p.lng;
       });
-      items.forEach(function (it) {
-        var m = clusterMarkers[it.id];
-        if (m) {
-          m.setLatLng([it.lat, it.lng]);
-          if (m._count !== it.count) { m.setIcon(makeClusterIcon(it.count)); m._count = it.count; }
+      return Math.sqrt(Math.pow(maxLat - minLat, 2) + Math.pow(maxLng - minLng, 2));
+    }
+    // How close a new cluster from the server has to sit to a previously
+    // tracked one (as a fraction of the same extent) to be treated as the
+    // SAME cluster rather than a fresh one. Needed because supercluster's
+    // cluster_id is tied to a tree node at a specific zoom level: zooming by
+    // even one level gives almost every on-screen cluster a brand new id even
+    // when the real-world grouping barely moved, which without this match
+    // would read as the entire map flushing and re-entering on every zoom step.
+    var CLUSTER_MATCH_FRACTION = 0.3;
+    var clusterKeySeq = 0;
+    function resolveClusterKeys(clusterList, trackedClusterPairs, thresholdSq) {
+      var candidates = [];
+      clusterList.forEach(function (c, ni) {
+        trackedClusterPairs.forEach(function (pair) {
+          var d = distSq(c.lat, c.lng, pair.v.lat, pair.v.lng);
+          if (d <= thresholdSq) candidates.push({ ni: ni, key: pair.key, d: d });
+        });
+      });
+      candidates.sort(function (a, b) { return a.d - b.d; });
+      var matchedNext = {}, matchedTracked = {}, resolved = {};
+      candidates.forEach(function (cand) {
+        if (matchedNext[cand.ni] || matchedTracked[cand.key]) return;
+        matchedNext[cand.ni] = true;
+        matchedTracked[cand.key] = true;
+        resolved[cand.ni] = cand.key;
+      });
+      return clusterList.map(function (_, ni) {
+        return resolved[ni] !== undefined ? resolved[ni] : ('c:new:' + clusterKeySeq++);
+      });
+    }
+    // Persistent markers keyed by 'p:'+id / 'c:'+id, spanning both layers so a
+    // point turning into a cluster (or back) is one continuous reconcile
+    // instead of two independent ones — needed to find, for a marker with no
+    // id match in the previous frame, the nearest marker that just vanished
+    // so it can fly out from (split) or converge into (merge) that spot. The
+    // server exposes no real parent/child relationship between an old cluster
+    // and what replaces it, so nearest-vanished-neighbour is an approximation,
+    // but the right one in both directions.
+    //
+    // A vanished entry stays in this dict (marked exiting, with its pending
+    // removal timer) rather than being deleted right away: a bounds flap
+    // right at a supercluster bucket boundary can bring the same key back
+    // before its fade-out finishes, and deleting eagerly would leave the old
+    // marker fading out on the map while a duplicate new one fades in on top
+    // of it.
+    var markers = {};
+    window.renderMarkers = function (points, clusters) {
+      var trackedClusterPairs = [];
+      Object.keys(markers).forEach(function (key) {
+        if (markers[key].kind === 'cluster') trackedClusterPairs.push({ key: key, v: markers[key] });
+      });
+      var matchExtentPoints = points.concat(clusters);
+      Object.keys(markers).forEach(function (key) { matchExtentPoints.push(markers[key]); });
+      var matchThresholdSq = Math.pow(extentOf(matchExtentPoints) * CLUSTER_MATCH_FRACTION, 2);
+      var clusterKeys = resolveClusterKeys(clusters, trackedClusterPairs, matchThresholdSq);
+
+      var next = {};
+      points.forEach(function (it) { next['p:' + it.id] = { kind: 'point', it: it }; });
+      clusters.forEach(function (it, i) { next[clusterKeys[i]] = { kind: 'cluster', it: it }; });
+
+      var vanishing = [];
+      Object.keys(markers).forEach(function (key) {
+        if (!next[key] && !markers[key].exiting) vanishing.push(markers[key]);
+      });
+      var extentPoints = vanishing.slice();
+      Object.keys(next).forEach(function (key) { extentPoints.push(next[key].it); });
+      var maxFlightSq = Math.pow(extentOf(extentPoints) * FLIGHT_EXTENT_FRACTION, 2);
+
+      Object.keys(next).forEach(function (key) {
+        var entry = next[key];
+        var it = entry.it;
+        var existing = markers[key];
+        if (existing) {
+          if (existing.exiting) {
+            clearTimeout(existing.exitTimer);
+            existing.exiting = false;
+            animateIcon(existing.m, FADE_MS + 20);
+            existing.m.setOpacity(1);
+          }
+          if (existing.lat !== it.lat || existing.lng !== it.lng) {
+            animateIcon(existing.m, FLY_MS);
+            existing.m.setLatLng([it.lat, it.lng]);
+            existing.lat = it.lat; existing.lng = it.lng;
+          }
+          if (entry.kind === 'point' && existing.m._kind !== it.kind) {
+            existing.m.setIcon(makeIcon(it.kind)); existing.m._kind = it.kind;
+          } else if (entry.kind === 'cluster' && existing.m._count !== it.count) {
+            existing.m.setIcon(makeClusterIcon(it.count)); existing.m._count = it.count;
+          }
           return;
         }
-        m = L.marker([it.lat, it.lng], { icon: makeClusterIcon(it.count) }).addTo(clusterLayer);
-        m._count = it.count;
-        m.on('click', function () {
-          programmatic = true;
-          map.flyTo([it.lat, it.lng], Math.min(map.getZoom() + 2, 18), { animate: true });
-          post({ type: 'clusterpress', id: it.id });
+
+        var nearest = null;
+        vanishing.forEach(function (v) {
+          var d = distSq(it.lat, it.lng, v.lat, v.lng);
+          if (d > maxFlightSq) return;
+          if (!nearest || d < distSq(it.lat, it.lng, nearest.lat, nearest.lng)) nearest = v;
         });
-        clusterMarkers[it.id] = m;
+        var startLat = nearest ? nearest.lat : it.lat;
+        var startLng = nearest ? nearest.lng : it.lng;
+        var targetLayer = entry.kind === 'point' ? layer : clusterLayer;
+        var icon = entry.kind === 'point' ? makeIcon(it.kind) : makeClusterIcon(it.count);
+        var m = L.marker([startLat, startLng], { icon: icon, opacity: 0 }).addTo(targetLayer);
+        if (entry.kind === 'point') {
+          m._kind = it.kind;
+          m.on('click', function () {
+            var ll = m.getLatLng();
+            post({ type: 'spotpress', id: it.id, lat: ll.lat, lng: ll.lng });
+          });
+        } else {
+          m._count = it.count;
+          m.on('click', function () {
+            programmatic = true;
+            map.flyTo([it.lat, it.lng], Math.min(map.getZoom() + 2, 18), { animate: true });
+            post({ type: 'clusterpress', id: it.id });
+          });
+        }
+        markers[key] = { key: key, m: m, kind: entry.kind, lat: it.lat, lng: it.lng, exiting: false, exitTimer: null };
+        animateIcon(m, Math.max(FLY_MS, FADE_MS) + 20);
+        // Two rAFs: the first lets the marker's initial (opacity:0, start
+        // position) paint commit, so the second's changes are a transition
+        // from that frame rather than getting coalesced into the same one.
+        requestAnimationFrame(function () {
+          requestAnimationFrame(function () {
+            m.setOpacity(1);
+            if (nearest) m.setLatLng([it.lat, it.lng]);
+          });
+        });
+      });
+
+      vanishing.forEach(function (v) {
+        v.exiting = true;
+        animateIcon(v.m, FADE_MS + 20);
+        v.m.setOpacity(0);
+        v.exitTimer = setTimeout(function () {
+          (v.kind === 'point' ? layer : clusterLayer).removeLayer(v.m);
+          delete markers[v.key];
+        }, FADE_MS);
       });
     };
     post({ type: 'ready' });
@@ -228,11 +340,9 @@ export function LeafletMap({
   const readyRef = useRef(false)
 
   function renderMarkers() {
-    ref.current?.injectJavaScript(`window.render(${JSON.stringify(payload)}); true;`)
-  }
-
-  function renderClusters() {
-    ref.current?.injectJavaScript(`window.renderClusters(${JSON.stringify(clusterPayload)}); true;`)
+    ref.current?.injectJavaScript(
+      `window.renderMarkers(${JSON.stringify(payload)}, ${JSON.stringify(clusterPayload)}); true;`,
+    )
   }
 
   function recenter() {
@@ -254,15 +364,13 @@ export function LeafletMap({
   }
 
   // Markers update without recentering, so panning the map doesn't snap back.
+  // One combined effect (not one per payload) so a mode flip between points
+  // and clusters reconciles both in the same call — needed for the entering
+  // side of the split/merge animation to see the other side's vanishing keys.
   useEffect(() => {
     if (readyRef.current) renderMarkers()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payload])
-
-  useEffect(() => {
-    if (readyRef.current) renderClusters()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [clusterPayload])
+  }, [payload, clusterPayload])
 
   useEffect(() => {
     if (readyRef.current) recenter()
@@ -297,7 +405,6 @@ export function LeafletMap({
         recenter()
         renderUser()
         renderMarkers()
-        renderClusters()
       } else if (msg.type === 'clusterpress' && msg.id) {
         const cluster = clusters.find((c) => c.id === msg.id)
         if (cluster) onClusterPress?.(cluster)

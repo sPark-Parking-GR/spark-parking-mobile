@@ -118,6 +118,10 @@ export interface SearchParams {
   startsAt: string
   endsAt: string
   vehicleType?: string
+  // The `mode` of the last response for this map session, echoed back so the
+  // server can apply hysteresis around its points/clusters threshold instead
+  // of flipping the whole map on every small pan/zoom.
+  preferMode?: 'points' | 'clusters'
 }
 
 async function withAuthRetry<T>(
@@ -171,6 +175,7 @@ export function searchFacilities(
         }
       : {}),
     ...(params.vehicleType ? { vehicleType: params.vehicleType } : {}),
+    ...(params.preferMode ? { preferMode: params.preferMode } : {}),
   })
   return request<FacilitySearchResponse>(`/facilities/search?${query.toString()}`, {
     signal: opts?.signal as RequestInit['signal'],

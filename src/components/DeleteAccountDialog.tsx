@@ -1,4 +1,4 @@
-import { spacing, typography, useTheme } from '@spark/ui'
+import { spacing, typography, useTheme } from '../theme'
 import { useState } from 'react'
 import {
   KeyboardAvoidingView,

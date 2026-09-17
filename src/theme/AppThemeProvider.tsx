@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { ThemeProvider } from '@spark/ui'
-import type { ThemeOverride, ThemeStorageAdapter } from '@spark/ui'
+import { ThemeProvider } from './ThemeProvider'
+import type { ThemeOverride, ThemeStorageAdapter } from './ThemeProvider'
 import type { ReactElement, ReactNode } from 'react'
 import { useColorScheme } from 'react-native'
 

@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
-import { Badge, spacing, typography, useTheme } from '@spark/ui'
+import { Badge, spacing, typography, useTheme } from '../../src/theme'
 import { useFocusEffect } from 'expo-router'
 import { useCallback } from 'react'
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native'
@@ -38,7 +38,7 @@ function SavedFacilityRow({
     >
       <Card style={styles.card}>
         <View style={styles.avatar}>
-          <Svg style={StyleSheet.absoluteFillObject} width="100%" height="100%">
+          <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
             <Defs>
               <LinearGradient id="savedAvatarGrad" x1="0" y1="0" x2="1" y2="1">
                 <Stop offset="0" stopColor={colors.pri} />

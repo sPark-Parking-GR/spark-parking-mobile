@@ -1,4 +1,4 @@
-import { radii, spacing, typography, useTheme } from '@spark/ui'
+import { radii, spacing, typography, useTheme } from '../theme'
 import { useCallback, useEffect, useState } from 'react'
 import { StyleSheet, Text, useWindowDimensions, View, type ListRenderItem } from 'react-native'
 import { Gesture, GestureDetector } from 'react-native-gesture-handler'

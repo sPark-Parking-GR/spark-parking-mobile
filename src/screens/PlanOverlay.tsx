@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
-import { spacing, typography, useTheme } from '@spark/ui'
+import { spacing, typography, useTheme } from '../theme'
 import { useCallback, useEffect, useState } from 'react'
 import {
   ActivityIndicator,

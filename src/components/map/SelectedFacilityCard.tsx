@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
-import { radii, spacing, typography, useTheme } from '@spark/ui'
+import { radii, spacing, typography, useTheme } from '../../theme'
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 
 import { useLanguage } from '../../i18n/LanguageProvider'

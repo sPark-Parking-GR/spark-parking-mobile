@@ -172,7 +172,7 @@ describe('guest favourites', () => {
     expect(result.current.saved).toEqual([cachedFacility('f1')])
 
     asUser('u1')
-    rerender()
+    rerender(undefined as any)
     await flush()
 
     expect(mockedSave).toHaveBeenCalledWith('f1', expect.anything())

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
-import { Card, SegmentedControl, spacing, typography, useTheme } from '@spark/ui'
-import type { ThemeMode } from '@spark/ui'
+import { Card, SegmentedControl, spacing, typography, useTheme } from '../../src/theme'
+import type { ThemeMode } from '../../src/theme'
 import { useEffect, useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'

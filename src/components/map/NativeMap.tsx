@@ -1,10 +1,11 @@
-import { typography, useTheme } from '@spark/ui'
+import { typography, useTheme } from '../../theme'
 import { useEffect, useRef } from 'react'
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native'
-import MapView, { Marker, PROVIDER_GOOGLE, type Region } from 'react-native-maps'
+import { Animated, StyleSheet, Text, useWindowDimensions } from 'react-native'
+import MapView, { MarkerAnimated, PROVIDER_GOOGLE, type LatLng, type Region } from 'react-native-maps'
 
 import { MapPin, PIN_ANCHOR } from './logo'
 import type { MapProps } from './types'
+import { useAnimatedMarkers } from './useAnimatedMarkers'
 
 // Dark basemap (Google, Android) tuned to the navy brand canvas.
 const DARK_MAP_STYLE = [
@@ -48,6 +49,7 @@ export function NativeMap({
   const { mode, colors } = useTheme()
   const ref = useRef<MapView>(null)
   const { height: screenHeight } = useWindowDimensions()
+  const markers = useAnimatedMarkers(results, clusters)
 
   const region: Region = {
     latitude: center.lat,
@@ -115,63 +117,81 @@ export function NativeMap({
         onMapPress()
       }}
     >
-      {results.map((r) => (
-        <Marker
-          key={r.id}
-          coordinate={{ latitude: r.lat, longitude: r.lng }}
-          tracksViewChanges={false}
-          anchor={PIN_ANCHOR}
-          onPress={async () => {
-            onSpotSelect(r.id)
-            const [cam, bounds] = await Promise.all([
-              ref.current?.getCamera(),
-              ref.current?.getMapBoundaries(),
-            ])
-            // Shift the target north by the center offset (converted from px to
-            // degrees via the currently visible latitude span), so the spot lands
-            // in the middle of the viewport still visible between the top bar and
-            // the sheet/selected-spot card, not behind either.
-            const latitudeDelta = bounds
-              ? bounds.northEast.latitude - bounds.southWest.latitude
-              : DELTA
-            const offsetLat = (getCenterOffsetPx() / screenHeight) * latitudeDelta
-            const targetLat = r.lat - offsetLat
-            if (
-              cam &&
-              Math.abs(cam.center.latitude - targetLat) < CENTER_EPS &&
-              Math.abs(cam.center.longitude - r.lng) < CENTER_EPS
-            )
-              return
-            ref.current?.animateCamera(
-              { center: { latitude: targetLat, longitude: r.lng } },
-              { duration: 350 },
-            )
-          }}
-        >
-          <MapPin kind={r.kind} colors={colors} mode={mode} />
-        </Marker>
-      ))}
-      {clusters.map((c) => (
-        <Marker
-          key={c.id}
-          coordinate={{ latitude: c.lat, longitude: c.lng }}
-          tracksViewChanges={false}
-          onPress={async () => {
-            const cam = await ref.current?.getCamera()
-            ref.current?.animateCamera(
-              { center: { latitude: c.lat, longitude: c.lng }, zoom: (cam?.zoom ?? 12) + 2 },
-              { duration: 350 },
-            )
-            onClusterPress?.(c)
-          }}
-        >
-          <View
-            style={[styles.cluster, { backgroundColor: colors.pri, borderColor: colors.surface }]}
+      {markers.map((m) => {
+        const scale = m.progress.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] })
+        if (m.kind === 'point') {
+          const r = m.data
+          return (
+            <MarkerAnimated
+              key={m.key}
+              coordinate={m.region as unknown as LatLng}
+              tracksViewChanges={m.animating}
+              anchor={PIN_ANCHOR}
+              onPress={async () => {
+                onSpotSelect(r.id)
+                const [cam, bounds] = await Promise.all([
+                  ref.current?.getCamera(),
+                  ref.current?.getMapBoundaries(),
+                ])
+                // Shift the target north by the center offset (converted from px to
+                // degrees via the currently visible latitude span), so the spot lands
+                // in the middle of the viewport still visible between the top bar and
+                // the sheet/selected-spot card, not behind either.
+                const latitudeDelta = bounds
+                  ? bounds.northEast.latitude - bounds.southWest.latitude
+                  : DELTA
+                const offsetLat = (getCenterOffsetPx() / screenHeight) * latitudeDelta
+                const targetLat = r.lat - offsetLat
+                if (
+                  cam &&
+                  Math.abs(cam.center.latitude - targetLat) < CENTER_EPS &&
+                  Math.abs(cam.center.longitude - r.lng) < CENTER_EPS
+                )
+                  return
+                ref.current?.animateCamera(
+                  { center: { latitude: targetLat, longitude: r.lng } },
+                  { duration: 350 },
+                )
+              }}
+            >
+              <Animated.View style={{ opacity: m.progress, transform: [{ scale }] }}>
+                <MapPin kind={r.kind} colors={colors} mode={mode} />
+              </Animated.View>
+            </MarkerAnimated>
+          )
+        }
+
+        const c = m.data
+        return (
+          <MarkerAnimated
+            key={m.key}
+            coordinate={m.region as unknown as LatLng}
+            tracksViewChanges={m.animating}
+            onPress={async () => {
+              const cam = await ref.current?.getCamera()
+              ref.current?.animateCamera(
+                { center: { latitude: c.lat, longitude: c.lng }, zoom: (cam?.zoom ?? 12) + 2 },
+                { duration: 350 },
+              )
+              onClusterPress?.(c)
+            }}
           >
-            <Text style={[styles.clusterText, { color: colors.ink }]}>{c.count}</Text>
-          </View>
-        </Marker>
-      ))}
+            <Animated.View
+              style={[
+                styles.cluster,
+                {
+                  backgroundColor: colors.pri,
+                  borderColor: colors.surface,
+                  opacity: m.progress,
+                  transform: [{ scale }],
+                },
+              ]}
+            >
+              <Text style={[styles.clusterText, { color: colors.ink }]}>{c.count}</Text>
+            </Animated.View>
+          </MarkerAnimated>
+        )
+      })}
     </MapView>
   )
 }

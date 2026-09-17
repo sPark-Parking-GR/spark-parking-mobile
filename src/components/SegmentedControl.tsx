@@ -1,5 +1,5 @@
 import { MaterialCommunityIcons } from '@expo/vector-icons'
-import { typography, useTheme } from '@spark/ui'
+import { typography, useTheme } from '../theme'
 import { useEffect, useRef, useState } from 'react'
 import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native'
 import Animated, {

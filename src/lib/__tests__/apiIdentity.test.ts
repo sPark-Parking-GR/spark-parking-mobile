@@ -1,4 +1,4 @@
-import type { AuthResult, AuthSession } from '@spark/types'
+import type { AuthResult, AuthSession } from '../../types/auth'
 
 import { ApiIdentity } from '../apiIdentity'
 import * as authApi from '../authApi'

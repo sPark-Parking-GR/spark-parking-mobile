@@ -1,4 +1,4 @@
-import type { ThemeContextValue, ThemeMode } from '@spark/ui'
+import type { ThemeContextValue, ThemeMode } from '../../theme'
 import Svg, { Defs, G, LinearGradient, Path, Stop } from 'react-native-svg'
 
 import type { FacilityKind } from '../../lib/api'

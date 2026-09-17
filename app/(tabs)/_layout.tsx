@@ -1,9 +1,10 @@
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs'
 import { Ionicons } from '@expo/vector-icons'
-import { radii, spacing, useTheme } from '@spark/ui'
+import { radii, spacing, useTheme } from '../../src/theme'
 import { BlurView } from 'expo-blur'
 import { Tabs } from 'expo-router'
-import { useRef, type ReactNode } from 'react'
+import { useRef, type ComponentProps, type ReactNode } from 'react'
+
+type BottomTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0]
 import { Pressable, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import Animated, {

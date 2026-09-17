@@ -1,4 +1,4 @@
-import { spacing, useTheme } from '@spark/ui'
+import { spacing, useTheme } from '../theme'
 import { type ReactNode, useEffect, useState } from 'react'
 import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native'
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler'

@@ -1,4 +1,4 @@
-import type { SignInCredentials } from '@spark/types'
+import type { SignInCredentials } from '../types/auth'
 import type { ReactElement, ReactNode } from 'react'
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from 'react'
 

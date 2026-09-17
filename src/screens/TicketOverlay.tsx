@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
-import { spacing, typography, useTheme } from '@spark/ui'
+import { spacing, typography, useTheme } from '../theme'
 import { router } from 'expo-router'
 import { useEffect } from 'react'
 import { ActivityIndicator, BackHandler, ScrollView, StyleSheet, Text, View } from 'react-native'

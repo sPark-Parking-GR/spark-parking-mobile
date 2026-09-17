@@ -1,6 +1,9 @@
 {
-  "extends": "../../packages/config/tsconfig/react-native.json",
+  "extends": "expo/tsconfig.base",
   "compilerOptions": {
+    "strict": true,
+    "skipLibCheck": true,
+    "types": ["jest"],
     "paths": {
       "@/*": ["./src/*"]
     }

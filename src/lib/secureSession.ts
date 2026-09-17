@@ -1,4 +1,4 @@
-import type { AuthSession, UserRole } from '@spark/types'
+import type { AuthSession, UserRole } from '../types/auth'
 import * as SecureStore from 'expo-secure-store'
 import { z } from 'zod'
 

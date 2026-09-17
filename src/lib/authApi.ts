@@ -1,4 +1,4 @@
-import type { AuthResult, SignInCredentials } from '@spark/types'
+import type { AuthResult, SignInCredentials } from '../types/auth'
 
 import { request, requestNoContent } from './http'
 

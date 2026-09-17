@@ -1,4 +1,4 @@
-import type { AuthUser, SignInCredentials } from '@spark/types'
+import type { AuthUser, SignInCredentials } from '../types/auth'
 
 import { ApiIdentity } from './apiIdentity'
 import type { SignUpRequest } from './authApi'

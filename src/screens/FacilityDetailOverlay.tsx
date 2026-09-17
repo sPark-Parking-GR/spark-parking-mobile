@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons'
-import { computeDistanceMeters } from '@spark/maps'
-import { spacing, typography, useTheme } from '@spark/ui'
+import { computeDistanceMeters } from '../lib/geo'
+import { spacing, typography, useTheme } from '../theme'
 import { useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
