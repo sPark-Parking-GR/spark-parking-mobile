@@ -1,5 +1,5 @@
 {
-  "name": "@spark/mobile",
+  "name": "spark-mobile",
   "version": "0.0.1",
   "private": true,
   "main": "expo-router/entry",
@@ -8,7 +8,7 @@
     "dev": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",
-    "lint": "eslint \"src/**/*.{ts,tsx}\"",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\"",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "eas-build": "npx eas-cli build --profile development --platform android"
@@ -61,6 +61,7 @@
     "eslint-config-universe": "^13.0.0",
     "jest": "^29.7.0",
     "jest-expo": "^57.0.5",
+    "prettier": "^3.3.3",
     "react-test-renderer": "19.2.3",
     "typescript": "^6.0.3"
   },
@@ -74,6 +75,9 @@
       "node-releases": "2.0.55",
       "typed-array-byte-offset": "1.0.4",
       "which-typed-array": "1.1.22"
+    },
+    "peerDependencyRules": {
+      "ignoreMissing": ["react-dom"]
     }
   }
 }

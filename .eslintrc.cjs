@@ -1,5 +1,22 @@
 /** @type {import("eslint").Linter.Config} */
 module.exports = {
   root: true,
-  extends: [require.resolve('@spark/config/eslint/react-native')],
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'prettier',
+    'universe/native',
+  ],
+  plugins: ['@typescript-eslint'],
+  parser: '@typescript-eslint/parser',
+  rules: {
+    '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+    '@typescript-eslint/no-explicit-any': 'warn',
+    '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
+    // universe/native re-enables prettier-as-a-lint-rule; formatting is owned by
+    // standalone prettier scripts, not ESLint.
+    'prettier/prettier': 'off',
+  },
+  ignorePatterns: ['dist/', 'node_modules/', '.turbo/'],
 }
