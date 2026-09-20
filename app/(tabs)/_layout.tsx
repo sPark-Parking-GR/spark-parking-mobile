@@ -1,8 +1,8 @@
 import { Ionicons } from '@expo/vector-icons'
 import { radii, spacing, useTheme } from '../../src/theme'
-import { BlurView } from 'expo-blur'
+import { BlurTargetView, BlurView } from 'expo-blur'
 import { Tabs } from 'expo-router'
-import { useRef, type ComponentProps, type ReactNode } from 'react'
+import { useRef, type ComponentProps, type ReactNode, type RefObject } from 'react'
 
 type BottomTabBarProps = Parameters<NonNullable<ComponentProps<typeof Tabs>['tabBar']>>[0]
 import { Pressable, StyleSheet, Text, View } from 'react-native'
@@ -84,7 +84,11 @@ function CustomTabBar({
   descriptors,
   navigation,
   scaleByRoute,
-}: BottomTabBarProps & { scaleByRoute: Record<string, SharedValue<number>> }) {
+  blurTarget,
+}: BottomTabBarProps & {
+  scaleByRoute: Record<string, SharedValue<number>>
+  blurTarget: RefObject<View | null>
+}) {
   const { colors, mode } = useTheme()
   const insets = useSafeAreaInsets()
   const { overlay, sheet } = useOverlay()
@@ -115,7 +119,8 @@ function CustomTabBar({
         <BlurView
           tint={mode === 'dark' ? 'dark' : 'light'}
           intensity={70}
-          experimentalBlurMethod="dimezisBlurView"
+          blurMethod="dimezisBlurView"
+          blurTarget={blurTarget}
           style={StyleSheet.absoluteFill}
         />
         <View
@@ -203,54 +208,66 @@ export default function TabsLayout() {
   if (sheet?.type === 'timePicker') lastTimePicker.current = sheet
   const timePicker = lastTimePicker.current
 
+  // What the tab bar's Android blur samples as its background — the screen
+  // content underneath it, not the bar itself.
+  const blurTarget = useRef<View>(null)
+
   return (
     <SheetExpandContext.Provider value={sheetProgress}>
       <View style={styles.root}>
-        <Tabs
-          tabBar={(props) => <CustomTabBar {...props} scaleByRoute={scaleByRoute} />}
-          screenOptions={{ headerShown: false }}
-        >
-          <Tabs.Screen
-            name="map"
-            options={{
-              title: t('navMap'),
-              tabBarIcon: ({ focused, color, size }) => (
-                <Ionicons name={focused ? 'map' : 'map-outline'} color={color} size={size} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="saved"
-            options={{
-              title: t('navSaved'),
-              tabBarIcon: ({ focused, color, size }) => (
-                <Ionicons name={focused ? 'star' : 'star-outline'} color={color} size={size} />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="trips"
-            options={{
-              title: t('navTrips'),
-              tabBarIcon: ({ focused, color, size }) => (
-                <Ionicons
-                  name={focused ? 'receipt' : 'receipt-outline'}
-                  color={color}
-                  size={size}
-                />
-              ),
-            }}
-          />
-          <Tabs.Screen
-            name="profile"
-            options={{
-              title: t('navProfile'),
-              tabBarIcon: ({ focused, color, size }) => (
-                <Ionicons name={focused ? 'person' : 'person-outline'} color={color} size={size} />
-              ),
-            }}
-          />
-        </Tabs>
+        <BlurTargetView ref={blurTarget} style={styles.root}>
+          <Tabs
+            tabBar={(props) => (
+              <CustomTabBar {...props} scaleByRoute={scaleByRoute} blurTarget={blurTarget} />
+            )}
+            screenOptions={{ headerShown: false }}
+          >
+            <Tabs.Screen
+              name="map"
+              options={{
+                title: t('navMap'),
+                tabBarIcon: ({ focused, color, size }) => (
+                  <Ionicons name={focused ? 'map' : 'map-outline'} color={color} size={size} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="saved"
+              options={{
+                title: t('navSaved'),
+                tabBarIcon: ({ focused, color, size }) => (
+                  <Ionicons name={focused ? 'star' : 'star-outline'} color={color} size={size} />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="trips"
+              options={{
+                title: t('navTrips'),
+                tabBarIcon: ({ focused, color, size }) => (
+                  <Ionicons
+                    name={focused ? 'receipt' : 'receipt-outline'}
+                    color={color}
+                    size={size}
+                  />
+                ),
+              }}
+            />
+            <Tabs.Screen
+              name="profile"
+              options={{
+                title: t('navProfile'),
+                tabBarIcon: ({ focused, color, size }) => (
+                  <Ionicons
+                    name={focused ? 'person' : 'person-outline'}
+                    color={color}
+                    size={size}
+                  />
+                ),
+              }}
+            />
+          </Tabs>
+        </BlurTargetView>
 
         {overlay?.type === 'facilityDetail' && (
           <View style={styles.overlay}>
