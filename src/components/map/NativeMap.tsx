@@ -13,15 +13,19 @@ const DARK_MAP_STYLE = [
   { elementType: 'labels.text.fill', stylers: [{ color: '#8a96a0' }] },
   { elementType: 'labels.text.stroke', stylers: [{ color: '#020c14' }] },
   { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#1f3340' }] },
-  { featureType: 'poi', elementType: 'labels.text.fill', stylers: [{ color: '#6b7780' }] },
-  { featureType: 'poi.park', elementType: 'geometry', stylers: [{ color: '#0d2016' }] },
   { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#16242e' }] },
   { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#0c1a24' }] },
   { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#24333d' }] },
   { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#0a6a99' }] },
-  { featureType: 'transit', elementType: 'geometry', stylers: [{ color: '#15252f' }] },
   { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#020c14' }] },
   { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3a4b56' }] },
+]
+
+// Suppresses Google's own place markers (POI icons/labels, transit stations) so the
+// only points on the map are our facility pins.
+const HIDE_PLACES_STYLE = [
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
 ]
 
 const DELTA = 0.04
@@ -45,6 +49,7 @@ export function NativeMap({
   onMapPress,
   onSpotSelect,
   getCenterOffsetPx,
+  topInset,
 }: MapProps) {
   const { mode, colors } = useTheme()
   const ref = useRef<MapView>(null)
@@ -106,7 +111,10 @@ export function NativeMap({
       initialRegion={region}
       showsUserLocation
       showsMyLocationButton={false}
-      customMapStyle={mode === 'dark' ? DARK_MAP_STYLE : []}
+      // Keeps the compass (and Google's logo/attribution) clear of the floating
+      // top bar, which otherwise sits on top of them at the literal map edge.
+      mapPadding={{ top: topInset, right: 0, bottom: 0, left: 0 }}
+      customMapStyle={mode === 'dark' ? [...DARK_MAP_STYLE, ...HIDE_PLACES_STYLE] : HIDE_PLACES_STYLE}
       userInterfaceStyle={mode}
       onRegionChangeComplete={handleRegion}
       onRegionChangeStart={(_region, details) => {

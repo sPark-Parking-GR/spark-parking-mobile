@@ -39,6 +39,10 @@ export interface MapProps {
   // A spot marker was selected — used to collapse the sheet and show the
   // selected-spot card above it.
   onSpotSelect: (id: string) => void
+  // Height (px) of the floating top bar (search pill + filters button), used to
+  // push the native map's own chrome (compass, Google logo) below it instead of
+  // under the literal top edge — see NativeMap's mapPadding.
+  topInset: number
   // How far (px) to shift a centered point's on-screen position from the literal
   // screen middle, read fresh whenever the map centers a point. Positive moves
   // the point up (toward the top bar), negative moves it down (toward the

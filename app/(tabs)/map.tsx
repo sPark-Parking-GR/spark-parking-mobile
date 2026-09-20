@@ -425,6 +425,7 @@ export default function MapScreen() {
             setSelectedId(id)
           }}
           getCenterOffsetPx={getCenterOffsetPx}
+          topInset={topOcclusion}
         />
       </View>
 
