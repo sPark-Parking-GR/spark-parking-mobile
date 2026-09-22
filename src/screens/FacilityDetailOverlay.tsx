@@ -24,6 +24,7 @@ import { getFacility, getQuote, type FacilityDetail, type PriceQuote } from '../
 import { amenityLabel, VEHICLE_ICONS, VEHICLE_TYPES } from '../lib/constants'
 import { openDirections } from '../lib/directions'
 import { formatDistance, formatMoney, formatTimeRange } from '../lib/format'
+import { NetworkError } from '../lib/http'
 import { useUserLocation } from '../lib/location'
 import { useSavedFacilities } from '../lib/savedFacilities'
 import { useOverlay } from '../navigation/OverlayContext'
@@ -222,7 +223,7 @@ export function FacilityDetailOverlay({
         if (!cancelled) setFacility(f)
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : t('facilityNotFound'))
+        if (!cancelled) setError(t(e instanceof NetworkError ? 'networkError' : 'facilityNotFound'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)

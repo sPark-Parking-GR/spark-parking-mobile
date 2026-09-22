@@ -10,6 +10,18 @@ export class ApiError extends Error {
   }
 }
 
+// `fetch` itself rejects (no `Response` at all) when the device cannot reach the API —
+// offline, wrong host, refused connection, TLS failure. That rejection's message is
+// whatever the native layer produced (e.g. a raw `java.net.ConnectException` string on
+// Android), never localized and never meant for a user, so it is normalized to this
+// dedicated type instead of being surfaced as-is.
+export class NetworkError extends Error {
+  constructor() {
+    super('Network request failed')
+    this.name = 'NetworkError'
+  }
+}
+
 interface ErrorBody {
   message?: string | string[]
   errors?: { path: string; message: string }[]
@@ -35,7 +47,12 @@ async function send(path: string, init?: RequestInit): Promise<Response> {
   const body = isWrite ? (init?.body ?? '{}') : init?.body
   if (body != null) headers['Content-Type'] = 'application/json'
 
-  const response = await fetch(`${BASE_URL}${path}`, { ...init, method, headers, body })
+  let response: Response
+  try {
+    response = await fetch(`${BASE_URL}${path}`, { ...init, method, headers, body })
+  } catch {
+    throw new NetworkError()
+  }
 
   if (!response.ok) {
     const errBody = (await response.json().catch(() => ({}))) as ErrorBody

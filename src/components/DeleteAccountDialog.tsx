@@ -13,7 +13,7 @@ import {
 
 import { useAuth } from '../auth/AuthProvider'
 import { useLanguage } from '../i18n/LanguageProvider'
-import { ApiError } from '../lib/http'
+import { ApiError, NetworkError } from '../lib/http'
 import { Button, Card, Field } from './ui'
 
 const PASSWORD_MAX = 128
@@ -23,6 +23,7 @@ const PASSWORD_MAX = 128
 function errorKey(error: unknown): string {
   if (error instanceof ApiError && error.status === 401) return 'deleteAccountWrongPassword'
   if (error instanceof ApiError && error.status === 409) return 'deleteAccountHasBookings'
+  if (error instanceof NetworkError) return 'networkError'
   return 'deleteAccountError'
 }
 

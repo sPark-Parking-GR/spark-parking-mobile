@@ -25,6 +25,7 @@ import {
   type MyDriverSubscription,
 } from '../lib/api'
 import { formatDateTime, formatMoney } from '../lib/format'
+import { NetworkError } from '../lib/http'
 import { identity } from '../lib/identity'
 import { useOverlay } from '../navigation/OverlayContext'
 
@@ -225,7 +226,7 @@ export function PlanOverlay() {
         setPlans(catalog)
       })
       .catch((e) => {
-        if (!cancelled) setError(e instanceof Error ? e.message : t('planLoadFailed'))
+        if (!cancelled) setError(t(e instanceof NetworkError ? 'networkError' : 'planLoadFailed'))
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -266,7 +267,7 @@ export function PlanOverlay() {
         setCheckoutPlanId(null)
       }
     } catch (e) {
-      setCheckoutError(e instanceof Error ? e.message : t('planCheckoutFailed'))
+      setCheckoutError(t(e instanceof NetworkError ? 'networkError' : 'planCheckoutFailed'))
       setCheckoutPlanId(null)
     }
   }

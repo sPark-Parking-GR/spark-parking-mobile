@@ -12,6 +12,7 @@ import type { HeldBooking } from '../lib/booking'
 import { holdBooking, holdIsLive, newIdempotencyKey, settleBooking } from '../lib/booking'
 import { vehicleLabel } from '../lib/constants'
 import { formatDateTime, formatMoney, formatTimeRange } from '../lib/format'
+import { NetworkError } from '../lib/http'
 import { identity } from '../lib/identity'
 import { collectPayment } from '../lib/payments'
 import { useOverlay } from '../navigation/OverlayContext'
@@ -154,7 +155,7 @@ export function ReviewOverlay({
         currency: confirmed.currency,
       })
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('reviewError'))
+      setError(t(e instanceof NetworkError ? 'networkError' : 'reviewError'))
       setPhase('idle')
     } finally {
       inFlight.current = false
