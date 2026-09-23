@@ -1,17 +1,37 @@
-import { useEffect, useRef, type ElementRef } from 'react'
-import { StyleSheet, Text, View } from 'react-native'
-import MapView, { Callout, Marker, type Region } from 'react-native-maps'
-import type { FacilitySearchResult } from '../../lib/api'
-import { formatDistance } from '../../lib/format'
-import { colors, font } from '../../theme'
-import { LogoMark } from './logo'
-import type { MapProps } from './types'
+import { typography, useTheme } from '../../theme'
+import { useEffect, useRef } from 'react'
+import { Animated, StyleSheet, Text, useWindowDimensions } from 'react-native'
+import MapView, {
+  MarkerAnimated,
+  PROVIDER_GOOGLE,
+  type LatLng,
+  type Region,
+} from 'react-native-maps'
 
-function metaLine(r: FacilitySearchResult): string {
-  return (
-    (r.available ? 'Διαθέσιμο' : 'Πλήρες') + ' · ' + formatDistance(r.distanceMeters)
-  )
-}
+import { MapPin, PIN_ANCHOR } from './logo'
+import type { MapProps } from './types'
+import { useAnimatedMarkers } from './useAnimatedMarkers'
+
+// Dark basemap (Google, Android) tuned to the navy brand canvas.
+const DARK_MAP_STYLE = [
+  { elementType: 'geometry', stylers: [{ color: '#0a1721' }] },
+  { elementType: 'labels.text.fill', stylers: [{ color: '#8a96a0' }] },
+  { elementType: 'labels.text.stroke', stylers: [{ color: '#020c14' }] },
+  { featureType: 'administrative', elementType: 'geometry', stylers: [{ color: '#1f3340' }] },
+  { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#16242e' }] },
+  { featureType: 'road', elementType: 'geometry.stroke', stylers: [{ color: '#0c1a24' }] },
+  { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#24333d' }] },
+  { featureType: 'road.highway', elementType: 'geometry.stroke', stylers: [{ color: '#0a6a99' }] },
+  { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#020c14' }] },
+  { featureType: 'water', elementType: 'labels.text.fill', stylers: [{ color: '#3a4b56' }] },
+]
+
+// Suppresses Google's own place markers (POI icons/labels, transit stations) so the
+// only points on the map are our facility pins.
+const HIDE_PLACES_STYLE = [
+  { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+  { featureType: 'transit', stylers: [{ visibility: 'off' }] },
+]
 
 const DELTA = 0.04
 // Floor on the fitted span so a user standing next to a parking doesn't zoom to street level.
@@ -27,15 +47,19 @@ export function NativeMap({
   fitBounds,
   fitNonce,
   results,
-  onMarkerPress,
+  clusters,
+  onClusterPress,
   onRegionChange,
+  onUserGesture,
   onMapPress,
   onSpotSelect,
+  getCenterOffsetPx,
+  topInset,
 }: MapProps) {
+  const { mode, colors } = useTheme()
   const ref = useRef<MapView>(null)
-  const markerRefs = useRef<Record<string, ElementRef<typeof Marker> | null>>({})
-  const selectedId = useRef<string | null>(null)
-  const calloutOpen = useRef(false)
+  const { height: screenHeight } = useWindowDimensions()
+  const markers = useAnimatedMarkers(results, clusters)
 
   const region: Region = {
     latitude: center.lat,
@@ -45,7 +69,11 @@ export function NativeMap({
   }
 
   useEffect(() => {
-    ref.current?.animateToRegion(region, 350)
+    // This region always resets to the fixed DELTA zoom, so (unlike the spot-tap
+    // centering below) the resulting latitude span is known upfront — no need to
+    // query the live camera bounds first.
+    const offsetLat = (getCenterOffsetPx() / screenHeight) * DELTA
+    ref.current?.animateToRegion({ ...region, latitude: center.lat - offsetLat }, 350)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [center.lat, center.lng, centerNonce])
 
@@ -62,11 +90,6 @@ export function NativeMap({
     )
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fitNonce])
-
-  // Refetch re-renders the markers, dropping the open callout; reopen the selected one.
-  useEffect(() => {
-    if (selectedId.current) markerRefs.current[selectedId.current]?.showCallout()
-  }, [results])
 
   function handleRegion(r: Region) {
     const latM = r.latitudeDelta * 111_320
@@ -88,89 +111,115 @@ export function NativeMap({
   return (
     <MapView
       ref={ref}
+      provider={PROVIDER_GOOGLE}
       style={styles.fill}
       initialRegion={region}
       showsUserLocation
+      showsMyLocationButton={false}
+      // Keeps the compass (and Google's logo/attribution) clear of the floating
+      // top bar, which otherwise sits on top of them at the literal map edge.
+      mapPadding={{ top: topInset, right: 0, bottom: 0, left: 0 }}
+      customMapStyle={
+        mode === 'dark' ? [...DARK_MAP_STYLE, ...HIDE_PLACES_STYLE] : HIDE_PLACES_STYLE
+      }
+      userInterfaceStyle={mode}
       onRegionChangeComplete={handleRegion}
+      onRegionChangeStart={(_region, details) => {
+        if (details.isGesture) onUserGesture?.()
+      }}
       onPress={(e) => {
         if (e.nativeEvent.action === 'marker-press') return
-        if (calloutOpen.current) {
-          calloutOpen.current = false
-          return
-        }
         onMapPress()
       }}
     >
-      {results.map((r) => (
-        <Marker
-          key={r.id}
-          ref={(node) => {
-            markerRefs.current[r.id] = node
-          }}
-          coordinate={{ latitude: r.lat, longitude: r.lng }}
-          tracksViewChanges={false}
-          anchor={{ x: 0.5, y: 1 }}
-          onPress={async () => {
-            selectedId.current = r.id
-            calloutOpen.current = true
-            onSpotSelect()
-            const cam = await ref.current?.getCamera()
-            if (
-              cam &&
-              Math.abs(cam.center.latitude - r.lat) < CENTER_EPS &&
-              Math.abs(cam.center.longitude - r.lng) < CENTER_EPS
-            )
-              return
-            ref.current?.animateCamera({ center: { latitude: r.lat, longitude: r.lng } }, { duration: 350 })
-          }}
-        >
-          <View style={styles.marker}>
-            <View style={[styles.pin, { backgroundColor: r.available ? colors.primary : '#9AA0A6' }]}>
-              <View style={styles.pinInner}>
-                <LogoMark size={16} color="#fff" />
-              </View>
-            </View>
-          </View>
-          <Callout onPress={() => onMarkerPress(r.id)}>
-            <View style={styles.callout}>
-              <Text style={styles.calloutName}>{r.name}</Text>
-              <Text style={styles.calloutAddr}>{r.address}</Text>
-              <Text style={styles.calloutMeta}>{metaLine(r)}</Text>
-              <Text style={styles.calloutCta}>Λεπτομέρειες →</Text>
-            </View>
-          </Callout>
-        </Marker>
-      ))}
+      {markers.map((m) => {
+        const scale = m.progress.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1] })
+        if (m.kind === 'point') {
+          const r = m.data
+          return (
+            <MarkerAnimated
+              key={m.key}
+              coordinate={m.region as unknown as LatLng}
+              tracksViewChanges={m.animating}
+              anchor={PIN_ANCHOR}
+              onPress={async () => {
+                onSpotSelect(r.id)
+                const [cam, bounds] = await Promise.all([
+                  ref.current?.getCamera(),
+                  ref.current?.getMapBoundaries(),
+                ])
+                // Shift the target north by the center offset (converted from px to
+                // degrees via the currently visible latitude span), so the spot lands
+                // in the middle of the viewport still visible between the top bar and
+                // the sheet/selected-spot card, not behind either.
+                const latitudeDelta = bounds
+                  ? bounds.northEast.latitude - bounds.southWest.latitude
+                  : DELTA
+                const offsetLat = (getCenterOffsetPx() / screenHeight) * latitudeDelta
+                const targetLat = r.lat - offsetLat
+                if (
+                  cam &&
+                  Math.abs(cam.center.latitude - targetLat) < CENTER_EPS &&
+                  Math.abs(cam.center.longitude - r.lng) < CENTER_EPS
+                )
+                  return
+                ref.current?.animateCamera(
+                  { center: { latitude: targetLat, longitude: r.lng } },
+                  { duration: 350 },
+                )
+              }}
+            >
+              <Animated.View style={{ opacity: m.progress, transform: [{ scale }] }}>
+                <MapPin kind={r.kind} colors={colors} mode={mode} />
+              </Animated.View>
+            </MarkerAnimated>
+          )
+        }
+
+        const c = m.data
+        return (
+          <MarkerAnimated
+            key={m.key}
+            coordinate={m.region as unknown as LatLng}
+            tracksViewChanges={m.animating}
+            onPress={async () => {
+              const cam = await ref.current?.getCamera()
+              ref.current?.animateCamera(
+                { center: { latitude: c.lat, longitude: c.lng }, zoom: (cam?.zoom ?? 12) + 2 },
+                { duration: 350 },
+              )
+              onClusterPress?.(c)
+            }}
+          >
+            <Animated.View
+              style={[
+                styles.cluster,
+                {
+                  backgroundColor: colors.pri,
+                  borderColor: colors.surface,
+                  opacity: m.progress,
+                  transform: [{ scale }],
+                },
+              ]}
+            >
+              <Text style={[styles.clusterText, { color: colors.ink }]}>{c.count}</Text>
+            </Animated.View>
+          </MarkerAnimated>
+        )
+      })}
     </MapView>
   )
 }
 
 const styles = StyleSheet.create({
   fill: { flex: 1 },
-  marker: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
-  pin: {
-    width: 34,
-    height: 34,
+  cluster: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-    borderTopLeftRadius: 17,
-    borderTopRightRadius: 17,
-    borderBottomRightRadius: 0,
-    borderBottomLeftRadius: 17,
-    transform: [{ rotate: '45deg' }],
-    shadowColor: '#000',
-    shadowOpacity: 0.22,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 4,
   },
-  pinInner: { transform: [{ rotate: '-45deg' }] },
-  callout: { minWidth: 180, paddingVertical: 2, gap: 2 },
-  calloutName: { fontSize: 14, fontWeight: '600', color: colors.textMain },
-  calloutAddr: { fontSize: font.tiny, color: colors.textSecondary },
-  calloutMeta: { fontSize: font.small, color: colors.textMain, marginTop: 2 },
-  calloutCta: { fontSize: font.small, fontWeight: '600', color: colors.primary, marginTop: 4 },
+  clusterText: { fontSize: typography.body.fontSize, fontWeight: '700' },
 })
-

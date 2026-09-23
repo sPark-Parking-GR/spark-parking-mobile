@@ -1,6 +1,14 @@
-export function formatMoney(cents: number, currency = 'EUR'): string {
+import type { Locale } from '../i18n/messages'
+
+function toIntlLocale(locale: Locale): string {
+  return locale === 'en' ? 'en-US' : 'el-GR'
+}
+
+export function formatMoney(cents: number, locale: Locale, currency = 'EUR'): string {
   try {
-    return new Intl.NumberFormat('el-GR', { style: 'currency', currency }).format(cents / 100)
+    return new Intl.NumberFormat(toIntlLocale(locale), { style: 'currency', currency }).format(
+      cents / 100,
+    )
   } catch {
     return `${(cents / 100).toFixed(2)} €`
   }
@@ -18,19 +26,20 @@ export function formatDistance(meters: number): string {
   return `${(meters / 1000).toFixed(1)} km`
 }
 
-export function formatDateTime(iso: string): string {
+export function formatDateTime(iso: string, locale: Locale): string {
   try {
-    return new Intl.DateTimeFormat('el-GR', { dateStyle: 'medium', timeStyle: 'short' }).format(
-      new Date(iso),
-    )
+    return new Intl.DateTimeFormat(toIntlLocale(locale), {
+      dateStyle: 'medium',
+      timeStyle: 'short',
+    }).format(new Date(iso))
   } catch {
     return new Date(iso).toLocaleString()
   }
 }
 
-export function formatDateTimeShort(iso: string): string {
+export function formatDateTimeShort(iso: string, locale: Locale): string {
   try {
-    return new Intl.DateTimeFormat('el-GR', {
+    return new Intl.DateTimeFormat(toIntlLocale(locale), {
       day: '2-digit',
       month: 'short',
       hour: '2-digit',
@@ -41,6 +50,12 @@ export function formatDateTimeShort(iso: string): string {
   }
 }
 
-export function formatTimeRange(startIso: string, endIso: string): string {
-  return `${formatDateTime(startIso)} → ${formatDateTime(endIso)}`
+export function formatTimeRange(startIso: string, endIso: string, locale: Locale): string {
+  return `${formatDateTime(startIso, locale)} → ${formatDateTime(endIso, locale)}`
+}
+
+// Grouped for dictation: operators read access codes down the phone when a scanner is
+// dead, and 26 unbroken characters is where that goes wrong.
+export function formatAccessCode(code: string): string {
+  return (code.match(/.{1,4}/g) ?? [code]).join(' ')
 }

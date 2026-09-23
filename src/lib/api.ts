@@ -1,19 +1,42 @@
-const BASE_URL = process.env['EXPO_PUBLIC_API_URL'] ?? 'http://127.0.0.1:3001/api/v1'
+import { z } from 'zod'
+
+import { ApiError, request, requestNoContent } from './http'
+import type { IdentityStrategy } from './identity'
+
+export type FacilityKind = 'BUSINESS' | 'FREE_PUBLIC' | 'RESTRICTED' | 'UNKNOWN'
+
+export type OnlineBookingStatus = 'NOT_OFFERED' | 'FULL' | 'OPEN'
 
 export interface FacilitySearchResult {
   id: string
   name: string
   address: string
+  kind: FacilityKind
   lat: number
   lng: number
   distanceMeters: number
   available: boolean
+  onlineBookingStatus: OnlineBookingStatus
   remainingSlots: number
   priceCents: number | null
   currency: string
   isPromoted: boolean
   rank: number
   thumbnailUrl: string | null
+}
+
+export interface FacilityCluster {
+  id: string
+  lat: number
+  lng: number
+  count: number
+}
+
+export interface FacilitySearchResponse {
+  mode: 'points' | 'clusters'
+  points: FacilitySearchResult[]
+  clusters: FacilityCluster[]
+  total: number
 }
 
 export interface QuoteLineItem {
@@ -40,6 +63,7 @@ export interface FacilityDetail {
   id: string
   name: string
   address: string
+  kind: FacilityKind
   lat: number
   lng: number
   totalCapacity: number
@@ -48,12 +72,41 @@ export interface FacilityDetail {
   heightRestrictionCm: number | null
   amenities: string[]
   cancellationPolicy: string
-  images: Array<{ id: string; url: string; altText: string | null }>
-  tariffPlans: Array<{
-    id: string
-    name: string
-    rules: Array<{ id: string; type: string; priceCents: number; currency: string; vehicleTypes: string[] }>
-  }>
+  images: { id: string; url: string; altText: string | null }[]
+  tariffAssignments: {
+    vehicleType: string
+    tariffPlan: {
+      id: string
+      name: string
+      isDefault: boolean
+      timezone: string
+      graceMinutes: number
+      incrementMinutes: number
+      version: number
+      vehicleTypes: string[]
+      tiers: {
+        id: string
+        fromMinute: number
+        toMinute: number | null
+        unit: string
+        blockMinutes: number | null
+        rates: { id: string; windowId: string; priceCents: number; currency: string }[]
+      }[]
+      windows: {
+        id: string
+        label: string
+        dayMask: number
+        startMinute: number
+        endMinute: number
+      }[]
+      caps: {
+        id: string
+        windowMinutes: number
+        capCents: number
+        scope: string
+      }[]
+    } | null
+  }[]
   rating: { average: number | null; count: number }
 }
 
@@ -65,33 +118,48 @@ export interface SearchParams {
   startsAt: string
   endsAt: string
   vehicleType?: string
+  // The `mode` of the last response for this map session, echoed back so the
+  // server can apply hysteresis around its points/clusters threshold instead
+  // of flipping the whole map on every small pan/zoom.
+  preferMode?: 'points' | 'clusters'
 }
 
-async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const method = (init?.method ?? 'GET').toUpperCase()
-  const isWrite = method !== 'GET' && method !== 'HEAD'
-  const headers: Record<string, string> = { ...(init?.headers as Record<string, string>) }
-
-  // React Native attaches an (empty) body to every POST, so a bodyless write
-  // reaches Fastify with content-type undefined → "Unsupported Media Type".
-  // Always send a valid JSON body for writes.
-  const body = isWrite ? (init?.body ?? '{}') : init?.body
-  if (body != null) headers['Content-Type'] = 'application/json'
-
-  const response = await fetch(`${BASE_URL}${path}`, { ...init, method, headers, body })
-
-  if (!response.ok) {
-    const errBody = (await response.json().catch(() => ({}))) as { message?: string }
-    throw new Error(errBody.message ?? `Request failed: ${response.status}`)
+async function withAuthRetry<T>(
+  identity: IdentityStrategy,
+  send: (authHeaders: Record<string, string>) => Promise<T>,
+): Promise<T> {
+  try {
+    return await send(await identity.authHeaders())
+  } catch (error) {
+    // Exactly one retry, and only for 401: the access token expired between the
+    // proactive freshness check and the request landing. A false here means the refresh
+    // token is gone too, so retrying could never succeed.
+    if (!(error instanceof ApiError) || error.status !== 401) throw error
+    if (!(await identity.recoverFromUnauthorized())) throw error
+    return send(await identity.authHeaders())
   }
+}
 
-  return response.json() as Promise<T>
+function withAuth(init: RequestInit, authHeaders: Record<string, string>): RequestInit {
+  return { ...init, headers: { ...(init.headers as Record<string, string>), ...authHeaders } }
+}
+
+function authedRequest<T>(path: string, init: RequestInit, identity: IdentityStrategy): Promise<T> {
+  return withAuthRetry(identity, (auth) => request<T>(path, withAuth(init, auth)))
+}
+
+function authedNoContent(
+  path: string,
+  init: RequestInit,
+  identity: IdentityStrategy,
+): Promise<void> {
+  return withAuthRetry(identity, (auth) => requestNoContent(path, withAuth(init, auth)))
 }
 
 export function searchFacilities(
   params: SearchParams,
   opts?: { signal?: AbortSignal },
-): Promise<FacilitySearchResult[]> {
+): Promise<FacilitySearchResponse> {
   const query = new URLSearchParams({
     lat: String(params.lat),
     lng: String(params.lng),
@@ -107,8 +175,9 @@ export function searchFacilities(
         }
       : {}),
     ...(params.vehicleType ? { vehicleType: params.vehicleType } : {}),
+    ...(params.preferMode ? { preferMode: params.preferMode } : {}),
   })
-  return request<FacilitySearchResult[]>(`/facilities/search?${query.toString()}`, {
+  return request<FacilitySearchResponse>(`/facilities/search?${query.toString()}`, {
     signal: opts?.signal as RequestInit['signal'],
   })
 }
@@ -125,4 +194,239 @@ export function getQuote(
 ): Promise<PriceQuote> {
   const query = new URLSearchParams({ startsAt, endsAt, vehicleType })
   return request<PriceQuote>(`/facilities/${id}/quote?${query.toString()}`)
+}
+
+export interface CreateBookingInput {
+  facilityId: string
+  startsAt: string
+  endsAt: string
+  vehicleType: string
+  vehiclePlate: string
+  idempotencyKey: string
+}
+
+export interface BookingResult {
+  bookingId: string
+  accessCode: string
+  expiresAt: string
+  amountCents: number
+  currency: string
+  clientSecret?: string
+  alreadyExisted: boolean
+}
+
+export interface ConfirmedBooking {
+  bookingId: string
+  accessCode: string
+  status: string
+  startsAt: string
+  endsAt: string
+  finalPriceCents: number
+  currency: string
+}
+
+export function createBooking(
+  input: CreateBookingInput,
+  identity: IdentityStrategy,
+): Promise<BookingResult> {
+  const body = {
+    facilityId: input.facilityId,
+    startsAt: input.startsAt,
+    endsAt: input.endsAt,
+    vehicleType: input.vehicleType,
+    vehiclePlate: input.vehiclePlate,
+    sourceChannel: 'MOBILE' as const,
+  }
+  return authedRequest<BookingResult>(
+    '/bookings',
+    {
+      method: 'POST',
+      headers: { 'Idempotency-Key': input.idempotencyKey },
+      body: JSON.stringify(body),
+    },
+    identity,
+  )
+}
+
+export function confirmBooking(
+  bookingId: string,
+  identity: IdentityStrategy,
+): Promise<ConfirmedBooking> {
+  return authedRequest<ConfirmedBooking>(
+    `/bookings/${bookingId}/confirm`,
+    { method: 'POST' },
+    identity,
+  )
+}
+
+/*
+ * The account-scoped read/write seam behind the trips and saved-facility caches. These
+ * four calls are the whole contract with the server: shapes are parsed rather than cast,
+ * so a route that is not deployed yet, or that answers in a different shape, surfaces as
+ * a rejection the caller already handles by falling back to its local cache.
+ */
+
+const MY_BOOKINGS_PAGE = 50
+
+const myBookingSchema = z.object({
+  id: z.string().min(1),
+  accessCode: z.string().min(1),
+  status: z.string().min(1),
+  startsAt: z.string().min(1),
+  endsAt: z.string().min(1),
+  vehicleType: z.string().min(1),
+  quotedPriceCents: z.number(),
+  finalPriceCents: z.number().nullable().optional(),
+  currency: z.string().min(1),
+  facility: z.object({ id: z.string().min(1), name: z.string() }),
+  createdAt: z.string().min(1),
+})
+
+export type MyBooking = z.infer<typeof myBookingSchema>
+
+const myBookingsSchema = z.object({ items: z.array(myBookingSchema) })
+
+// `facilityId`, not `id`: the row is the bookmark, and the endpoint keeps archived
+// bookmarks in the list carrying `available: false` instead of dropping them, so the
+// client — not the server — decides what an unreachable saved spot looks like.
+const savedFacilitySchema = z.object({
+  facilityId: z.string().min(1),
+  name: z.string(),
+  address: z.string(),
+  available: z.boolean(),
+})
+
+export type RemoteSavedFacility = z.infer<typeof savedFacilitySchema>
+
+const savedListSchema = z.object({ items: z.array(savedFacilitySchema) })
+
+export async function listMyBookings(identity: IdentityStrategy): Promise<MyBooking[]> {
+  const body = await authedRequest<unknown>(
+    `/bookings/mine?skip=0&take=${MY_BOOKINGS_PAGE}`,
+    { method: 'GET' },
+    identity,
+  )
+  return myBookingsSchema.parse(body).items
+}
+
+export async function listSavedFacilities(
+  identity: IdentityStrategy,
+): Promise<RemoteSavedFacility[]> {
+  const body = await authedRequest<unknown>('/saved-facilities', { method: 'GET' }, identity)
+  return savedListSchema.parse(body).items
+}
+
+export function saveFacility(facilityId: string, identity: IdentityStrategy): Promise<void> {
+  return authedNoContent(
+    '/saved-facilities',
+    { method: 'POST', body: JSON.stringify({ facilityId }) },
+    identity,
+  )
+}
+
+export function unsaveFacility(facilityId: string, identity: IdentityStrategy): Promise<void> {
+  return authedNoContent(`/saved-facilities/${facilityId}`, { method: 'DELETE' }, identity)
+}
+
+/*
+ * Driver subscriptions. The catalog is public; everything about the rider's own plan is
+ * account-scoped. Checkout is a hosted web page the OS browser opens — the app never sees
+ * card data and only learns the outcome by re-reading `/me` after the return deep link.
+ */
+
+// `features` stays `string[]` rather than a closed enum: the catalog is edited from the
+// admin portal, and a tier that ships a feature this build has no label for should render
+// with its raw name, not fail the whole screen's parse.
+const driverEntitlementsSchema = z.object({
+  bookingDiscountBps: z.number().nullable(),
+  bookingFeeWaived: z.boolean(),
+  freeCancellations: z.number().nullable(),
+  features: z.array(z.string()),
+})
+
+export type DriverEntitlements = z.infer<typeof driverEntitlementsSchema>
+
+const driverPlanSchema = z.object({
+  id: z.string().min(1),
+  code: z.string().min(1),
+  name: z.string(),
+  description: z.string().nullable(),
+  priceCents: z.number(),
+  currency: z.string().min(1),
+  interval: z.enum(['MONTHLY', 'YEARLY']),
+  entitlements: driverEntitlementsSchema,
+})
+
+export type DriverPlanSummary = z.infer<typeof driverPlanSchema>
+
+const driverPlansSchema = z.array(driverPlanSchema)
+
+const myDriverSubscriptionSchema = z.object({
+  planCode: z.string().nullable(),
+  planName: z.string().nullable(),
+  status: z.enum(['TRIALING', 'ACTIVE', 'PAST_DUE', 'CANCELLED']).nullable(),
+  currentPeriodEnd: z.string().nullable(),
+  entitlements: driverEntitlementsSchema,
+  source: z.enum(['free', 'subscription', 'subscription+override']),
+})
+
+export type MyDriverSubscription = z.infer<typeof myDriverSubscriptionSchema>
+
+const driverCheckoutSchema = z.object({ checkoutUrl: z.string().url() })
+
+export async function listDriverPlans(): Promise<DriverPlanSummary[]> {
+  const body = await request<unknown>('/driver-subscriptions/plans')
+  return driverPlansSchema.parse(body)
+}
+
+export async function getMyDriverSubscription(
+  identity: IdentityStrategy,
+): Promise<MyDriverSubscription> {
+  const body = await authedRequest<unknown>('/driver-subscriptions/me', { method: 'GET' }, identity)
+  return myDriverSubscriptionSchema.parse(body)
+}
+
+export async function createDriverSubscriptionCheckout(
+  planId: string,
+  identity: IdentityStrategy,
+): Promise<string> {
+  const body = await authedRequest<unknown>(
+    '/driver-subscriptions/checkout',
+    { method: 'POST', body: JSON.stringify({ planId }) },
+    identity,
+  )
+  return driverCheckoutSchema.parse(body).checkoutUrl
+}
+
+const issuedTicketSchema = z.object({
+  bookingId: z.string().min(1),
+  payload: z.string().min(1),
+  unixMinute: z.number().int(),
+  expiresAt: z.string().min(1),
+})
+
+export type IssuedTicket = z.infer<typeof issuedTicketSchema>
+
+/**
+ * The owner's rotating barrier code. The signing secret never leaves the server, so every
+ * payload is minted per request and stops being accepted a few minutes later — see
+ * RotatingQr for the polling that keeps one on screen.
+ */
+export async function getBookingQr(
+  bookingId: string,
+  identity: IdentityStrategy,
+): Promise<IssuedTicket> {
+  const body = await authedRequest<unknown>(
+    `/bookings/${bookingId}/qr`,
+    { method: 'GET' },
+    identity,
+  )
+
+  // Reported as a server fault rather than the raw ZodError, because the ticket screen
+  // reads "not an ApiError" as "the device is offline" — which a reachable server
+  // answering in the wrong shape is not.
+  const parsed = issuedTicketSchema.safeParse(body)
+  if (!parsed.success) throw new ApiError('Malformed ticket response', 502)
+
+  return parsed.data
 }

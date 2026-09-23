@@ -9,9 +9,10 @@ export interface UserLocation {
   retry: () => void
 }
 
-export function useUserLocation(): UserLocation {
+export function useUserLocation(options?: { auto?: boolean }): UserLocation {
+  const auto = options?.auto ?? true
   const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null)
-  const [status, setStatus] = useState<LocationStatus>('loading')
+  const [status, setStatus] = useState<LocationStatus>(auto ? 'loading' : 'unavailable')
 
   const locate = useCallback(async () => {
     setStatus('loading')
@@ -41,8 +42,8 @@ export function useUserLocation(): UserLocation {
   }, [])
 
   useEffect(() => {
-    locate()
-  }, [locate])
+    if (auto) locate()
+  }, [auto, locate])
 
   return { coords, status, retry: locate }
 }

@@ -1,4 +1,4 @@
-import type { FacilitySearchResult } from '../../lib/api'
+import type { FacilityCluster, FacilitySearchResult } from '../../lib/api'
 
 export interface MapBounds {
   north: number
@@ -25,12 +25,30 @@ export interface MapProps {
   // Bump to (re)apply fitBounds even if the bounds are unchanged.
   fitNonce: number
   results: FacilitySearchResult[]
-  onMarkerPress: (id: string) => void
+  // Grid-aggregated clusters shown on zoomed-out views instead of points.
+  clusters: FacilityCluster[]
+  // Optional analytics hook on cluster tap; the zoom-in is handled in-renderer.
+  onClusterPress?: (cluster: FacilityCluster) => void
   onRegionChange: (region: MapRegion) => void
-  // Tap on empty map (no spot, no open tooltip) — used to collapse the sheet.
+  // The user started moving the map (gesture only, not a programmatic camera
+  // move). Fires once at gesture start, so location-lock UI reacts without lag.
+  onUserGesture?: () => void
+  // Tap on empty map (no spot, no open card) — used to collapse the sheet and
+  // dismiss the selected-spot card.
   onMapPress: () => void
-  // A spot marker was selected (tooltip opening) — used to collapse the sheet.
-  onSpotSelect: () => void
+  // A spot marker was selected — used to collapse the sheet and show the
+  // selected-spot card above it.
+  onSpotSelect: (id: string) => void
+  // Height (px) of the floating top bar (search pill + filters button), used to
+  // push the native map's own chrome (compass, Google logo) below it instead of
+  // under the literal top edge — see NativeMap's mapPadding.
+  topInset: number
+  // How far (px) to shift a centered point's on-screen position from the literal
+  // screen middle, read fresh whenever the map centers a point. Positive moves
+  // the point up (toward the top bar), negative moves it down (toward the
+  // sheet/card) — so it lands in the middle of whatever viewport is still
+  // actually visible between the top search bar and the bottom sheet/card.
+  getCenterOffsetPx: () => number
 }
 
 export type MapRenderer = 'webview' | 'native'

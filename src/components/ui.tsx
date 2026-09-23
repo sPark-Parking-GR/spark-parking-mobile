@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons'
+import { spacing, typography, useTheme } from '../theme'
 import type { ReactNode } from 'react'
 import {
   ActivityIndicator,
@@ -9,10 +10,36 @@ import {
   View,
   type TextInputProps,
 } from 'react-native'
-import { colors, font, radius, space } from '../theme'
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated'
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg'
+
+const BTN_RADIUS = 15
+const GLOW_COLOR = '#249ED9'
 
 export function Card({ children, style }: { children: ReactNode; style?: object }) {
-  return <View style={[styles.card, style]}>{children}</View>
+  const { colors, radii, mode } = useTheme()
+  return (
+    <View
+      style={[
+        styles.card,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.line,
+          borderRadius: radii.md,
+        },
+        mode === 'light' && styles.cardShadow,
+        style,
+      ]}
+    >
+      {children}
+    </View>
+  )
 }
 
 export function Button({
@@ -22,33 +49,90 @@ export function Button({
   disabled,
   loading,
   icon,
+  iconPosition = 'leading',
+  animateIcon,
 }: {
   label: string
   onPress: () => void
-  variant?: 'primary' | 'secondary'
+  variant?: 'primary' | 'secondary' | 'danger'
   disabled?: boolean
   loading?: boolean
   icon?: keyof typeof Ionicons.glyphMap
+  iconPosition?: 'leading' | 'trailing'
+  animateIcon?: boolean
 }) {
+  const { colors } = useTheme()
   const isSecondary = variant === 'secondary'
-  const fg = isSecondary ? colors.primary : '#fff'
+  // Flat and red, with none of the primary button's gradient or glow: a destructive
+  // action should not look like the one the screen wants you to take.
+  const isDanger = variant === 'danger'
+  const fg = isSecondary ? colors.ink : '#fff'
+  const iconOffset = useSharedValue(0)
+  const iconAnimatedStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: iconOffset.value }],
+  }))
+
+  const handlePress = () => {
+    if (animateIcon) {
+      iconOffset.value = withSequence(
+        withTiming(6, { duration: 140, easing: Easing.out(Easing.quad) }),
+        withTiming(0, { duration: 180, easing: Easing.inOut(Easing.quad) }),
+      )
+    }
+    onPress()
+  }
+
+  const iconEl = icon ? (
+    <Animated.View style={animateIcon ? iconAnimatedStyle : undefined}>
+      <Ionicons name={icon} size={18} color={fg} />
+    </Animated.View>
+  ) : null
+
   return (
     <Pressable
-      onPress={onPress}
+      onPress={handlePress}
       disabled={disabled || loading}
       style={({ pressed }) => [
         styles.btn,
-        isSecondary ? styles.btnSecondary : styles.btnPrimary,
+        isSecondary
+          ? { backgroundColor: 'transparent', borderColor: colors.line }
+          : { borderColor: 'transparent' },
+        isDanger && { backgroundColor: colors.bad },
+        !isSecondary && !isDanger && !disabled && !loading && styles.btnGlow,
         pressed && !disabled && styles.btnPressed,
         (disabled || loading) && styles.btnDisabled,
       ]}
     >
+      {!isSecondary && !isDanger && (
+        <View style={styles.btnGradientClip}>
+          <Svg style={StyleSheet.absoluteFill} width="100%" height="100%">
+            <Defs>
+              <LinearGradient id="btnGrad" x1="0" y1="0" x2="0" y2="1">
+                <Stop offset="0" stopColor={colors.pri} />
+                <Stop offset="1" stopColor={colors.pri2} />
+              </LinearGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#btnGrad)" />
+          </Svg>
+        </View>
+      )}
       {loading ? (
         <ActivityIndicator color={fg} />
       ) : (
         <>
-          {icon ? <Ionicons name={icon} size={18} color={fg} /> : null}
-          <Text style={[styles.btnText, isSecondary && styles.btnTextSecondary]}>{label}</Text>
+          {iconPosition === 'leading' ? iconEl : null}
+          <Text
+            style={[
+              styles.btnText,
+              isSecondary
+                ? { fontSize: typography.label.fontSize, fontWeight: typography.label.fontWeight }
+                : { fontSize: 16, fontWeight: '800' },
+              { color: fg },
+            ]}
+          >
+            {label}
+          </Text>
+          {iconPosition === 'trailing' ? iconEl : null}
         </>
       )}
     </Pressable>
@@ -58,11 +142,12 @@ export function Button({
 type BadgeVariant = 'success' | 'warning' | 'error' | 'neutral'
 
 export function Badge({ label, variant = 'neutral' }: { label: string; variant?: BadgeVariant }) {
+  const { colors } = useTheme()
   const map = {
-    success: { bg: colors.successBg, fg: colors.success },
-    warning: { bg: colors.warningBg, fg: colors.warning },
-    error: { bg: colors.errorBg, fg: colors.error },
-    neutral: { bg: colors.neutralBg, fg: colors.textSecondary },
+    success: { bg: colors.okBg, fg: colors.ok },
+    warning: { bg: colors.warnBg, fg: colors.warn },
+    error: { bg: colors.badBg, fg: colors.bad },
+    neutral: { bg: colors.card2, fg: colors.muted },
   }[variant]
   return (
     <View style={[styles.badge, { backgroundColor: map.bg }]}>
@@ -71,16 +156,27 @@ export function Badge({ label, variant = 'neutral' }: { label: string; variant?:
   )
 }
 
-export function Field({
-  label,
-  ...props
-}: { label: string } & TextInputProps) {
+export function Field({ label, ...props }: { label: string } & TextInputProps) {
+  const { colors, radii } = useTheme()
   return (
     <View style={styles.field}>
-      <Text style={styles.fieldLabel}>{label}</Text>
+      <Text
+        style={[styles.fieldLabel, { fontSize: typography.caption.fontSize, color: colors.muted }]}
+      >
+        {label}
+      </Text>
       <TextInput
-        placeholderTextColor={colors.textSecondary}
-        style={styles.input}
+        placeholderTextColor={colors.muted}
+        style={[
+          styles.input,
+          {
+            fontSize: typography.label.fontSize,
+            borderColor: colors.line,
+            borderRadius: radii.sm,
+            backgroundColor: colors.surface,
+            color: colors.ink,
+          },
+        ]}
         {...props}
       />
     </View>
@@ -89,46 +185,51 @@ export function Field({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.md,
-    padding: space.md,
+    padding: spacing.md,
+  },
+  cardShadow: {
+    shadowColor: '#0C1B2A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 14,
+    elevation: 2,
   },
   btn: {
     minHeight: 48,
-    borderRadius: radius.md,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: 20,
     borderWidth: 1,
-    borderColor: 'transparent',
+    borderRadius: BTN_RADIUS,
   },
-  btnPrimary: { backgroundColor: colors.primary },
-  btnSecondary: { backgroundColor: 'transparent', borderColor: colors.primary },
+  btnGlow: {
+    shadowColor: GLOW_COLOR,
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 26,
+    elevation: 8,
+  },
+  btnGradientClip: {
+    ...StyleSheet.absoluteFill,
+    borderRadius: BTN_RADIUS,
+    overflow: 'hidden',
+  },
   btnPressed: { opacity: 0.85 },
   btnDisabled: { opacity: 0.5 },
-  btnText: { color: '#fff', fontSize: font.body, fontWeight: '600' },
-  btnTextSecondary: { color: colors.primary },
+  btnText: {},
   badge: { borderRadius: 999, paddingHorizontal: 10, paddingVertical: 3, alignSelf: 'flex-start' },
-  badgeText: { fontSize: font.tiny, fontWeight: '600' },
-  field: { marginBottom: space.md },
+  badgeText: { fontSize: 11, fontWeight: '800' },
+  field: { marginBottom: spacing.md },
   fieldLabel: {
-    fontSize: font.small,
     fontWeight: '500',
-    color: colors.textSecondary,
     marginBottom: 6,
   },
   input: {
     minHeight: 48,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: radius.sm,
     paddingHorizontal: 12,
-    fontSize: font.body,
-    backgroundColor: colors.surface,
-    color: colors.textMain,
   },
 })
