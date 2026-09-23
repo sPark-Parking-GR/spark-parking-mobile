@@ -6,8 +6,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   ...(config as ExpoConfig),
   plugins: [
     ...(config.plugins ?? []),
-    "expo-font",
-    "expo-notifications",
+    'expo-font',
+    'expo-notifications',
     [
       'react-native-maps',
       {

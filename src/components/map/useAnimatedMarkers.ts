@@ -205,7 +205,8 @@ export function useAnimatedMarkers(
         // straight from `results` elsewhere, so it needs no re-render here.
         const contentChanged =
           entry.kind === 'point'
-            ? (existing.data as FacilitySearchResult).kind !== (entry.data as FacilitySearchResult).kind
+            ? (existing.data as FacilitySearchResult).kind !==
+              (entry.data as FacilitySearchResult).kind
             : (existing.data as FacilityCluster).count !== (entry.data as FacilityCluster).count
         if (contentChanged) changed = true
         existing.data = entry.data

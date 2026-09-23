@@ -315,7 +315,8 @@ export const messages: Record<Locale, Record<string, string>> = {
     profileNotifications: 'Ειδοποιήσεις',
     profileNotificationsOn: 'Ενεργές',
     profileNotificationsOff: 'Ανενεργές',
-    profileNotificationsDenied: 'Οι ειδοποιήσεις είναι απενεργοποιημένες για το sPark στις ρυθμίσεις της συσκευής σου.',
+    profileNotificationsDenied:
+      'Οι ειδοποιήσεις είναι απενεργοποιημένες για το sPark στις ρυθμίσεις της συσκευής σου.',
     profileHelp: 'Βοήθεια & υποστήριξη',
     profileNotAvailableYet: 'Σύντομα διαθέσιμο',
     profileSignOut: 'Αποσύνδεση',
@@ -367,7 +368,8 @@ export const messages: Record<Locale, Record<string, string>> = {
     authForgotSent: 'Αν υπάρχει λογαριασμός με αυτή τη διεύθυνση, ο σύνδεσμος επαναφοράς στάλθηκε.',
     authGenericError: 'Κάτι πήγε στραβά. Δοκίμασε ξανά.',
     authEmailInUse: 'Αυτό το email είναι ήδη καταχωρημένο. Δοκίμασε να συνδεθείς.',
-    networkError: 'Δεν είναι δυνατή η σύνδεση με το sPark. Έλεγξε τη σύνδεσή σου στο διαδίκτυο και δοκίμασε ξανά.',
+    networkError:
+      'Δεν είναι δυνατή η σύνδεση με το sPark. Έλεγξε τη σύνδεσή σου στο διαδίκτυο και δοκίμασε ξανά.',
     themeDark: 'Σκούρο',
     themeLight: 'Ανοιχτό',
     mapSearchFailed: 'Η αναζήτηση απέτυχε',

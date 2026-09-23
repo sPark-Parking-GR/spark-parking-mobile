@@ -18,7 +18,11 @@ const FREE_PUBLIC_DARK_BG = '#0F3D28'
 // Pin color signals facility kind only, not live booking status (that's the
 // badge's job — FacilityCard, SelectedFacilityCard). BUSINESS always renders
 // the same as the "Διαθέσιμο"/Available look — the default brand pin.
-function pinTones(kind: FacilityKind, colors: PinColors, mode: ThemeMode): { back: string; fg: string } {
+function pinTones(
+  kind: FacilityKind,
+  colors: PinColors,
+  mode: ThemeMode,
+): { back: string; fg: string } {
   if (kind === 'FREE_PUBLIC') {
     return mode === 'dark'
       ? { back: FREE_PUBLIC_DARK_BG, fg: colors.ok }

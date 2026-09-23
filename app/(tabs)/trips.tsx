@@ -65,9 +65,7 @@ export default function TripsScreen() {
       <Text style={[styles.title, { color: colors.ink }]}>{t('tripsTitle')}</Text>
       {status === 'restoring' ? null : !isAuthenticated ? (
         <View style={styles.empty}>
-          <Text style={[styles.emptyText, { color: colors.faint }]}>
-            {t('tripsSignedOutBody')}
-          </Text>
+          <Text style={[styles.emptyText, { color: colors.faint }]}>{t('tripsSignedOutBody')}</Text>
           <Pressable
             onPress={() => openAuth('signIn')}
             style={({ pressed }) => [

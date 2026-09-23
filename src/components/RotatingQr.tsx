@@ -17,12 +17,7 @@ const ROTATION_MS = 60_000
 const BOUNDARY_LAG_MS = 750
 
 export type QrFailure =
-  | 'offline'
-  | 'signedOut'
-  | 'notFound'
-  | 'notIssuable'
-  | 'rateLimited'
-  | 'failed'
+  'offline' | 'signedOut' | 'notFound' | 'notIssuable' | 'rateLimited' | 'failed'
 
 export type QrTicketState =
   | { status: 'loading' }

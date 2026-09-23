@@ -327,8 +327,7 @@ export function LeafletMap({
   const html = useMemo(() => buildHtml(center, colors, mode), [mode])
 
   const payload = useMemo(
-    () =>
-      results.map((r) => ({ id: r.id, lat: r.lat, lng: r.lng, kind: r.kind })),
+    () => results.map((r) => ({ id: r.id, lat: r.lat, lng: r.lng, kind: r.kind })),
     [results],
   )
 

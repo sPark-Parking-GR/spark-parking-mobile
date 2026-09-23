@@ -1,10 +1,5 @@
 export type UserRole =
-  | 'guest'
-  | 'user'
-  | 'operator_staff'
-  | 'operator_admin'
-  | 'platform_admin'
-  | 'super_admin'
+  'guest' | 'user' | 'operator_staff' | 'operator_admin' | 'platform_admin' | 'super_admin'
 
 export interface AuthUser {
   id: string

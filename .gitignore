@@ -52,3 +52,7 @@ prisma/migrations/dev.db
 *.db
 
 mockups
+
+# android signing — never commit
+*.jks
+*.keystore

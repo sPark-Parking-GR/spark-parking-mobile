@@ -1,7 +1,12 @@
 import { typography, useTheme } from '../../theme'
 import { useEffect, useRef } from 'react'
 import { Animated, StyleSheet, Text, useWindowDimensions } from 'react-native'
-import MapView, { MarkerAnimated, PROVIDER_GOOGLE, type LatLng, type Region } from 'react-native-maps'
+import MapView, {
+  MarkerAnimated,
+  PROVIDER_GOOGLE,
+  type LatLng,
+  type Region,
+} from 'react-native-maps'
 
 import { MapPin, PIN_ANCHOR } from './logo'
 import type { MapProps } from './types'
@@ -114,7 +119,9 @@ export function NativeMap({
       // Keeps the compass (and Google's logo/attribution) clear of the floating
       // top bar, which otherwise sits on top of them at the literal map edge.
       mapPadding={{ top: topInset, right: 0, bottom: 0, left: 0 }}
-      customMapStyle={mode === 'dark' ? [...DARK_MAP_STYLE, ...HIDE_PLACES_STYLE] : HIDE_PLACES_STYLE}
+      customMapStyle={
+        mode === 'dark' ? [...DARK_MAP_STYLE, ...HIDE_PLACES_STYLE] : HIDE_PLACES_STYLE
+      }
       userInterfaceStyle={mode}
       onRegionChangeComplete={handleRegion}
       onRegionChangeStart={(_region, details) => {

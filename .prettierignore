@@ -1,0 +1,8 @@
+**/dist
+**/coverage
+**/*.tsbuildinfo
+pnpm-lock.yaml
+android
+ios
+.expo
+expo-env.d.ts
